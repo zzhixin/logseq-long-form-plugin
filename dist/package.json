@@ -1,0 +1,10 @@
+{
+  "name": "logseq-long-form-rebuild",
+  "version": "0.1.0",
+  "main": "index.html",
+  "logseq": {
+    "id": "logseq-long-form-rebuild",
+    "title": "Long Form Rebuild",
+    "icon": "./icon.svg"
+  }
+}
