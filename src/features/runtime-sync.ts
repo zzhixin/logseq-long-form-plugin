@@ -1,4 +1,4 @@
-import { syncExistingListMarkers } from "./lists";
+import { syncExistingListMarkers, syncOrderedListMarkers } from "./lists";
 import { syncMetaVisibilityClass } from "../logseq-dom";
 import { syncLongFormToolbarState } from "./mode";
 import { scheduleWordCountRefresh } from "./word-count";
@@ -7,7 +7,8 @@ let routeHookInstalled = false;
 
 export function refreshRuntimeState(): void {
   syncMetaVisibilityClass();
-  syncExistingListMarkers();
+  void syncExistingListMarkers();
+  void syncOrderedListMarkers();
   syncLongFormToolbarState();
   scheduleWordCountRefresh();
 }

@@ -108,13 +108,18 @@ npm run build
 
 已实现：
 
-- 对以 `- ` 开头的块加长文列表样式
+- 长文模式下保留 Logseq 原生 `numbered list` 的编号显示
+- 长文模式下保留 Logseq 原生 `bullet list` 的圆点显示
+- 在长文模式中输入 `- ` 时，自动转换为原生 bullet list
+- 顶层 numbered list 保持与普通正文左对齐
+- 嵌套 numbered list 和 bullet list 在长文模式下逐层缩进，且 **不受 `keepIndents` 开关影响**
 - 空列表项按回车时退出列表，创建同级新块
 - heading 块末尾回车时创建子块
 
 相关文件：
 
 - `src/features/lists.ts`
+- `src/styles.ts`
 
 ### 2.6 间隙日志时间戳
 
@@ -228,8 +233,6 @@ time:: HH:mm
 - 当前块祖先链的括号式辅助线
 - 点击辅助线折叠/展开
 - 选择性恢复原生树线
-
----
 
 ## 4. 已清理的无效代码
 

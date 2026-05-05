@@ -38,6 +38,7 @@ export function registerStyles(): void {
     --lf-content-width: ${settings.contentWidth}px;
     --lf-block-gap: ${settings.blockGap}px;
     --lf-body-block-gap: ${settings.bodyBlockGap}px;
+    --lf-list-indent-step: 1.5rem;
     --lf-rule: rgba(148, 163, 184, 0.24);
     --lf-meta-bg: rgba(148, 163, 184, 0.08);
     --lf-meta-fg: rgba(71, 85, 105, 0.9);
@@ -152,21 +153,19 @@ export function registerStyles(): void {
     opacity: 1 !important;
   }
 
-  .lf-long-form .ls-block[data-lf-ul="true"] > .block-main-container > .block-content-wrapper,
-  .lf-long-form .ls-block[data-lf-ul="true"] > .block-main-container > .editor-wrapper {
-    position: relative;
-    padding-left: 18px;
+  .lf-long-form .ls-block[data-lf-ordered-list="true"] .bullet-container,
+  .lf-long-form .ls-block[data-lf-ordered-list="true"] .bullet-link-wrap,
+  .lf-long-form .ls-block[data-lf-bullet-list="true"] .bullet-container,
+  .lf-long-form .ls-block[data-lf-bullet-list="true"] .bullet-link-wrap {
+    opacity: 1 !important;
   }
 
-  .lf-long-form .ls-block[data-lf-ul="true"] > .block-main-container > .block-content-wrapper::before,
-  .lf-long-form .ls-block[data-lf-ul="true"] > .block-main-container > .editor-wrapper::before {
-    content: "•";
-    position: absolute;
-    left: 2px;
-    top: 0.25rem;
-    color: rgba(71, 85, 105, 0.75);
-    font-size: 1rem;
-    line-height: 1;
+  .lf-long-form .ls-block[data-lf-ordered-list="true"] .block-control {
+    margin-left: calc(1.6rem + (var(${ "--lf-list-depth" }, 0) * var(--lf-list-indent-step))) !important;
+  }
+
+  .lf-long-form .ls-block[data-lf-bullet-list="true"] .block-control {
+    margin-left: calc(1.6rem + (var(${ "--lf-list-depth" }, 0) * var(--lf-list-indent-step))) !important;
   }
 
   #lf-word-count-root {

@@ -13,7 +13,9 @@ Implemented in the current build:
   - toggle auto heading
   - set heading level 1-6
 - Meta block creation and visibility toggles
-- List-aware styling for `- ` blocks
+- Native numbered list rendering in long-form mode
+- Native bullet list rendering for `- ` input in long-form mode
+- Nested numbered list indentation in long-form mode
 - Empty list exit behavior
 - Heading `Enter` behavior: create a child block
 - Interstitial journal timestamp insertion
