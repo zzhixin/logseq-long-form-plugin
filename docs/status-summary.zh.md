@@ -34,13 +34,13 @@ npm run build
 
 以下内容已经在当前工程里实现，并且保留在代码中。
 
-### 2.1 Long-form 模式切换
+### 2.1 显示模式切换
 
-- 顶栏按钮切换长文模式
-- 顶栏按钮带状态显示：
-  - `LF` = Long Form
-  - `OT` = Outline
-- 通过给 Logseq 主容器切换 class 来启用/关闭长文样式
+- 顶栏按钮循环切换三种显示模式：
+  - `长文` = 长文模式无缩进
+  - `长文·缩进` = 长文模式有缩进
+  - `大纲` = Logseq 原生大纲模式
+- 通过给 Logseq 主容器切换 `lf-long-form` / `lf-keep-indents` class 来控制样式
 
 相关文件：
 
@@ -54,7 +54,7 @@ npm run build
 - 收窄内容宽度
 - 调整 block 间距
 - 支持正文单独的 block gap 设置
-- 支持“保留缩进但隐藏 bullet”
+- 顶栏按钮支持三态切换：长文无缩进、长文有缩进、大纲模式
 - 隐藏原生 bullet，鼠标移到 bullet 热区时显示
 - 去掉常规长文模式下的原生树线
 
@@ -63,7 +63,6 @@ npm run build
 - `contentWidth`
 - `blockGap`
 - `bodyBlockGap`
-- `keepIndents`
 - `indentNonHeadingChildren`
 
 ### 2.3 标题相关命令和部分自动化
@@ -109,10 +108,10 @@ npm run build
 已实现：
 
 - 长文模式下保留 Logseq 原生 `numbered list` 的编号显示
-- 长文模式下保留 Logseq 原生 `bullet list` 的圆点显示
-- 在长文模式中输入 `- ` 时，自动转换为原生 bullet list
+- 对块内容以 `- ` 开头的项目，在长文模式下显示 unordered list 圆点
 - 顶层 numbered list 保持与普通正文左对齐
-- 嵌套 numbered list 和 bullet list 在长文模式下逐层缩进，且 **不受 `keepIndents` 开关影响**
+- 嵌套 numbered list 和 unordered list 在长文模式下逐层缩进
+- 非空 unordered list 项末尾按回车时，创建下一个 `- ` 列表项
 - 空列表项按回车时退出列表，创建同级新块
 - heading 块末尾回车时创建子块
 
@@ -234,6 +233,15 @@ time:: HH:mm
 - 点击辅助线折叠/展开
 - 选择性恢复原生树线
 
+### 3.6 Unordered list / `- ` bullet
+
+当前实现：
+
+- 不写入 `logseq.order-list-type:: bullet`
+- 只根据块内容前缀 `- ` 做渲染增强
+- 编辑态保留原始 `- ` 文本，preview 状态隐藏可见的 `- `
+- 非空 `- ` 项末尾回车时，尝试创建下一个 `- ` 项
+
 ## 4. 已清理的无效代码
 
 本轮已经从最终工程中清理掉这些“未真正交付”的部分：
@@ -255,7 +263,7 @@ time:: HH:mm
 当前插件设置里保留的主要项：
 
 - `enabledForRightSidebar`
-- `keepIndents`
+- `displayMode`（由顶栏三态按钮写入，不在设置面板中显示）
 - `indentNonHeadingChildren`
 - `showMetaBlocks`
 - `showTimestamps`
@@ -314,7 +322,7 @@ time:: HH:mm
 
 ### 7.1 顶栏按钮
 
-- `OT` / `LF`
+- `长文` / `长文·缩进` / `大纲`
 - `Export`
 
 ### 7.2 命令面板

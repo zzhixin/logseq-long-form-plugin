@@ -10,13 +10,6 @@ export const settingsSchema: SettingSchemaDesc[] = [
     description: "Apply long-form mode to the right sidebar container instead of the main content area.",
   },
   {
-    key: "keepIndents",
-    type: "boolean",
-    default: false,
-    title: "Keep indentation in long-form mode",
-    description: "When enabled, long-form mode keeps Logseq's nested indentation and only hides bullets.",
-  },
-  {
     key: "indentNonHeadingChildren",
     type: "boolean",
     default: true,
@@ -76,7 +69,7 @@ export const settingsSchema: SettingSchemaDesc[] = [
 
 export type PluginSettings = {
   enabledForRightSidebar: boolean;
-  keepIndents: boolean;
+  displayMode: "long-no-indent" | "long-indent" | "outline";
   indentNonHeadingChildren: boolean;
   showMetaBlocks: boolean;
   showTimestamps: boolean;
@@ -89,7 +82,7 @@ export type PluginSettings = {
 
 const defaultSettings: PluginSettings = {
   enabledForRightSidebar: false,
-  keepIndents: false,
+  displayMode: "outline",
   indentNonHeadingChildren: true,
   showMetaBlocks: false,
   showTimestamps: true,

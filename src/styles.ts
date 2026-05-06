@@ -4,13 +4,6 @@ export const STYLE_KEY = "lf-rebuild-style";
 
 export function registerStyles(): void {
   const settings = getSettings();
-  const keepIndents = settings.keepIndents
-    ? ""
-    : `
-  .lf-long-form .block-children-container {
-    margin-left: 0 !important;
-  }`;
-
   const nonHeadingIndent = settings.indentNonHeadingChildren
     ? `
   .lf-long-form .ls-block[data-heading="true"] > .block-children-container {
@@ -115,6 +108,10 @@ export function registerStyles(): void {
     opacity: 0.6;
   }
 
+  .lf-long-form:not(.lf-keep-indents) .block-children-container {
+    margin-left: 0 !important;
+  }
+
   .lf-long-form .bullet-container,
   .lf-long-form .bullet-link-wrap {
     opacity: 0 !important;
@@ -153,19 +150,40 @@ export function registerStyles(): void {
     opacity: 1 !important;
   }
 
-  .lf-long-form .ls-block[data-lf-ordered-list="true"] .bullet-container,
-  .lf-long-form .ls-block[data-lf-ordered-list="true"] .bullet-link-wrap,
-  .lf-long-form .ls-block[data-lf-bullet-list="true"] .bullet-container,
-  .lf-long-form .ls-block[data-lf-bullet-list="true"] .bullet-link-wrap {
+  .lf-long-form .ls-block[data-lf-ordered-list] > .block-main-container > .block-control-wrap .bullet-container,
+  .lf-long-form .ls-block[data-lf-ordered-list] > .block-main-container > .block-control-wrap .bullet-link-wrap,
+  .lf-long-form .ls-block[data-lf-unordered-list] > .block-main-container > .block-control-wrap .bullet-container,
+  .lf-long-form .ls-block[data-lf-unordered-list] > .block-main-container > .block-control-wrap .bullet-link-wrap {
     opacity: 1 !important;
   }
 
-  .lf-long-form .ls-block[data-lf-ordered-list="true"] .block-control {
+  .lf-long-form .ls-block[data-lf-ordered-list] > .block-main-container > .block-control-wrap {
     margin-left: calc(1.6rem + (var(${ "--lf-list-depth" }, 0) * var(--lf-list-indent-step))) !important;
   }
 
-  .lf-long-form .ls-block[data-lf-bullet-list="true"] .block-control {
+  .lf-long-form .ls-block[data-lf-unordered-list] > .block-main-container > .block-control-wrap {
     margin-left: calc(1.6rem + (var(${ "--lf-list-depth" }, 0) * var(--lf-list-indent-step))) !important;
+  }
+
+  .lf-long-form .ls-block[data-lf-unordered-prefix] > .block-main-container > .block-content-or-editor-inner > .block-row > .block-content-wrapper,
+  .lf-long-form .ls-block[data-lf-unordered-prefix] > .block-main-container > .block-content-wrapper {
+    position: relative;
+  }
+
+  .lf-long-form .ls-block[data-lf-unordered-prefix] > .block-main-container > .block-content-or-editor-inner > .block-row > .block-content-wrapper::after,
+  .lf-long-form .ls-block[data-lf-unordered-prefix] > .block-main-container > .block-content-wrapper::after {
+    content: attr(data-lf-unordered-text);
+    position: absolute;
+    inset: 2px 0 2px 0;
+    white-space: pre-wrap;
+    color: var(--ls-primary-text-color, inherit);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .lf-long-form .ls-block[data-lf-unordered-prefix] > .block-main-container > .block-content-or-editor-inner > .block-row > .block-content-wrapper .block-content,
+  .lf-long-form .ls-block[data-lf-unordered-prefix] > .block-main-container > .block-content-wrapper .block-content {
+    color: transparent !important;
   }
 
   #lf-word-count-root {
@@ -293,7 +311,6 @@ export function registerStyles(): void {
     color: inherit;
   }
 
-  ${keepIndents}
   ${nonHeadingIndent}
   ${timestampVisibility}
 `,

@@ -10,6 +10,12 @@ import { registerWordCountListeners } from "./features/word-count";
 import { getSettings, settingsSchema } from "./settings";
 import { registerStyles } from "./styles";
 
+type LogseqWithInternalApi = typeof logseq & {
+  _execCallableAPIAsync?: (method: string, ...args: unknown[]) => Promise<unknown>;
+};
+
+const LEGACY_PLUGIN_IDS = ["logseq-long-form-rebuild"];
+
 function cleanupLegacyUi(): void {
   logseq.provideUI({
     key: "lf-control-bar",
@@ -19,11 +25,39 @@ function cleanupLegacyUi(): void {
   });
 }
 
+async function cleanupRegisteredCommands(): Promise<void> {
+  const internalLogseq = logseq as LogseqWithInternalApi;
+  const pluginId = logseq.baseInfo?.id;
+
+  if (!pluginId || typeof internalLogseq._execCallableAPIAsync !== "function") {
+    return;
+  }
+
+  try {
+    const pluginIds = [pluginId, ...LEGACY_PLUGIN_IDS];
+    for (const id of pluginIds) {
+      await internalLogseq._execCallableAPIAsync("unregister_plugin_simple_command", id);
+    }
+  } catch {
+    // Best effort: older Logseq builds may not expose this internal cleanup API.
+  }
+}
+
+function installUnloadCleanup(): void {
+  logseq.beforeunload(async () => {
+    await cleanupRegisteredCommands();
+  });
+}
+
 function registerCommands(): void {
   logseq.App.registerCommandPalette(
     {
       key: "lf-toggle-mode",
-      label: "Long Form Rebuild: Toggle long-form mode",
+      label: "Long Form: Cycle display mode",
+      keybinding: {
+        mode: "global",
+        binding: "ctrl+d",
+      },
     },
     toggleLongFormMode,
   );
@@ -31,7 +65,7 @@ function registerCommands(): void {
   logseq.App.registerCommandPalette(
     {
       key: "lf-toggle-auto-heading",
-      label: "Long Form Rebuild: Toggle auto heading",
+      label: "Long Form: Toggle auto heading",
     },
     toggleAutoHeading,
   );
@@ -41,7 +75,7 @@ function registerCommands(): void {
     logseq.App.registerCommandPalette(
       {
         key: `lf-heading-${level}`,
-        label: `Long Form Rebuild: Set heading ${level}`,
+        label: `Long Form: Set heading ${level}`,
       },
       () => setHeadingLevel(level),
     );
@@ -50,7 +84,7 @@ function registerCommands(): void {
   logseq.App.registerCommandPalette(
     {
       key: "lf-create-meta-block",
-      label: "Long Form Rebuild: Create meta block",
+      label: "Long Form: Create meta block",
     },
     createMetaBlock,
   );
@@ -58,7 +92,7 @@ function registerCommands(): void {
   logseq.App.registerCommandPalette(
     {
       key: "lf-toggle-current-meta",
-      label: "Long Form Rebuild: Toggle current meta visibility",
+      label: "Long Form: Toggle current meta visibility",
     },
     toggleCurrentMetaVisibility,
   );
@@ -66,7 +100,7 @@ function registerCommands(): void {
   logseq.App.registerCommandPalette(
     {
       key: "lf-toggle-global-meta",
-      label: "Long Form Rebuild: Toggle global meta visibility",
+      label: "Long Form: Toggle global meta visibility",
     },
     toggleGlobalMetaVisibility,
   );
@@ -74,7 +108,7 @@ function registerCommands(): void {
   logseq.App.registerCommandPalette(
     {
       key: "lf-export-markdown",
-      label: "Long Form Rebuild: Show markdown export dialog",
+      label: "Long Form: Show markdown export dialog",
     },
     showExportDialog,
   );
@@ -82,7 +116,7 @@ function registerCommands(): void {
   logseq.App.registerCommandPalette(
     {
       key: "lf-copy-markdown",
-      label: "Long Form Rebuild: Copy current page or block as markdown",
+      label: "Long Form: Copy current page or block as markdown",
     },
     exportCurrentToClipboard,
   );
@@ -90,7 +124,7 @@ function registerCommands(): void {
   logseq.App.registerCommandPalette(
     {
       key: "lf-interstitial-journal",
-      label: "Long Form Rebuild: Insert interstitial journal timestamp",
+      label: "Long Form: Insert interstitial journal timestamp",
     },
     insertInterstitialJournalStamp,
   );
@@ -103,8 +137,8 @@ function registerCommands(): void {
   logseq.App.registerUIItem("toolbar", {
     key: "long-form-toggle",
     template: `
-      <a class="button" data-on-click="toggleLongFormMode" title="Toggle Long Form Mode" style="font-size: 12px; font-weight: 600; letter-spacing: 0; padding-inline: 7px;">
-        <span id="lf-toolbar-toggle-label">OT</span>
+      <a class="button" data-on-click="toggleLongFormMode" title="Cycle Long Form Display Mode" style="font-size: 12px; font-weight: 600; letter-spacing: 0; padding-inline: 7px;">
+        <span id="lf-toolbar-toggle-label">大纲</span>
       </a>
     `,
   });
@@ -112,8 +146,8 @@ function registerCommands(): void {
   logseq.App.registerUIItem("toolbar", {
     key: "long-form-export",
     template: `
-      <a class="button" data-on-click="showExportDialog" title="Export Markdown" style="font-size: 11px; font-weight: 500; letter-spacing: 0; padding-inline: 6px;">
-        Export
+      <a class="button" data-on-click="showExportDialog" title="Export Markdown" style="font-size: 16px; font-weight: 500; letter-spacing: 0; padding-inline: 6px;">
+        📤 
       </a>
     `,
   });
@@ -158,15 +192,17 @@ async function main(): Promise<void> {
   registerStyles();
   registerModel();
   cleanupLegacyUi();
+  installUnloadCleanup();
+  await cleanupRegisteredCommands();
   registerCommands();
   installSettingsHooks();
   installDomHooks();
   refreshRuntimeState();
 
   const settings = getSettings();
-  console.info("Long Form Rebuild loaded", settings);
+  console.info("logseq-long-form loaded", settings);
 }
 
 logseq.ready(main).catch((error) => {
-  console.error("Long Form Rebuild failed to start", error);
+  console.error("logseq-long-form failed to start", error);
 });

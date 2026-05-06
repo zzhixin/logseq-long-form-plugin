@@ -2,6 +2,14 @@ import { BlockEntity, ExportOptions } from "../types";
 
 const EXPORT_DIALOG_KEY = "lf-export-dialog";
 const EXPORT_DIALOG_ID = "lf-export-dialog-root";
+const ORDER_LIST_PROPERTY_KEYS = [
+  "logseq.order-list-type",
+  "logseq.orderListType",
+  "logseq.order_list_type",
+  "order-list-type",
+  "orderListType",
+  "order_list_type",
+] as const;
 
 let exportDialogMarkdown = "";
 
@@ -16,6 +24,18 @@ function stripIndentTags(content: string): string {
     .trim();
 }
 
+function stripOrderListProperties(content: string): string {
+  return content
+    .split("\n")
+    .filter((line) => !/^\s*(?:logseq\.)?order[-_.]?list[-_.]?type::\s*\S+\s*$/i.test(line))
+    .join("\n")
+    .trim();
+}
+
+function normalizeContent(content: string): string {
+  return stripOrderListProperties(stripIndentTags(stripMetaMarkers(content)));
+}
+
 function headingPrefix(block: BlockEntity): string {
   const heading = block.properties?.heading;
   if (heading === true) return "# ";
@@ -23,6 +43,22 @@ function headingPrefix(block: BlockEntity): string {
     return `${"#".repeat(heading)} `;
   }
   return "";
+}
+
+function stripMarkdownHeadingPrefix(line: string): string {
+  return line.replace(/^#{1,6}\s+/, "");
+}
+
+function getOrderListType(block: BlockEntity): string | null {
+  const properties = block.properties;
+  if (!properties) return null;
+
+  for (const key of ORDER_LIST_PROPERTY_KEYS) {
+    const value = properties[key];
+    if (typeof value === "string") return value;
+  }
+
+  return null;
 }
 
 function splitContentLines(content: string): string[] {
@@ -33,7 +69,7 @@ function linePrefix(line: string, depth: number): string {
   if (/^#{1,6}\s+/.test(line)) return "";
   if (/^\d+\.\s+/.test(line)) return `${"  ".repeat(depth)}`;
   if (/^[-*]\s+/.test(line)) return `${"  ".repeat(depth)}`;
-  return `${"  ".repeat(depth)}- `;
+  return `${"  ".repeat(depth)}`;
 }
 
 function renderLine(line: string, depth: number): string {
@@ -42,19 +78,27 @@ function renderLine(line: string, depth: number): string {
   return `${linePrefix(trimmed, depth)}${trimmed}`;
 }
 
+function renderOrderedListLine(line: string, depth: number): string {
+  const trimmed = line.trim();
+  if (!trimmed) return "";
+  if (/^\d+\.\s+/.test(trimmed)) return `${"  ".repeat(depth)}${trimmed}`;
+  return `${"  ".repeat(depth)}1. ${trimmed}`;
+}
+
 function blockToMarkdown(block: BlockEntity, depth: number, options: ExportOptions): string[] {
   const isMeta = block.content.includes("#.meta-block");
   if (isMeta && !options.includeMetaBlocks) return [];
 
-  const normalized = stripIndentTags(stripMetaMarkers(block.content));
+  const normalized = normalizeContent(block.content);
   const heading = headingPrefix(block);
+  const orderListType = getOrderListType(block);
   const childDepth = heading ? 0 : depth + 1;
   const contentLines = splitContentLines(normalized).filter((line) => line.trim().length > 0);
   const lines: string[] = [];
 
   if (contentLines.length > 0) {
     if (heading) {
-      lines.push(`${heading}${contentLines[0].trim()}`);
+      lines.push(`${heading}${stripMarkdownHeadingPrefix(contentLines[0].trim())}`);
       for (const line of contentLines.slice(1)) {
         lines.push(renderLine(line, childDepth));
       }
@@ -64,7 +108,7 @@ function blockToMarkdown(block: BlockEntity, depth: number, options: ExportOptio
       }
     } else {
       const [first, ...rest] = contentLines;
-      lines.push(renderLine(first, depth));
+      lines.push(orderListType === "number" ? renderOrderedListLine(first, depth) : renderLine(first, depth));
       for (const line of rest) {
         lines.push(`${"  ".repeat(depth + 1)}${line.trim()}`);
       }

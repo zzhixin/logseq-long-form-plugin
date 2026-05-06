@@ -1,15 +1,15 @@
 import { syncExistingListMarkers, syncOrderedListMarkers } from "./lists";
 import { syncMetaVisibilityClass } from "../logseq-dom";
-import { syncLongFormToolbarState } from "./mode";
+import { applySavedDisplayMode } from "./mode";
 import { scheduleWordCountRefresh } from "./word-count";
 
 let routeHookInstalled = false;
 
 export function refreshRuntimeState(): void {
   syncMetaVisibilityClass();
+  void applySavedDisplayMode();
   void syncExistingListMarkers();
   void syncOrderedListMarkers();
-  syncLongFormToolbarState();
   scheduleWordCountRefresh();
 }
 

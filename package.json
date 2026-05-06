@@ -1,12 +1,12 @@
 {
-  "name": "logseq-long-form-rebuild",
+  "name": "logseq-long-form",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist/index.html",
   "logseq": {
-    "id": "logseq-long-form-rebuild",
-    "title": "Long Form Rebuild",
+    "id": "logseq-long-form",
+    "title": "logseq-long-form",
     "icon": "./icon.svg"
   },
   "scripts": {

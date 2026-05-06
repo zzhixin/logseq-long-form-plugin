@@ -6,16 +6,16 @@ A source-based rebuild of a Logseq long-form writing plugin.
 
 Implemented in the current build:
 
-- Long-form mode toggle
-- Toolbar status button: `OT` / `LF`
+- Toolbar display-mode toggle: long-form without indentation / long-form with indentation / outline
 - Long-form writing styles
 - Heading commands:
   - toggle auto heading
   - set heading level 1-6
 - Meta block creation and visibility toggles
 - Native numbered list rendering in long-form mode
-- Native bullet list rendering for `- ` input in long-form mode
+- Unordered list rendering for blocks starting with `- ` in long-form mode
 - Nested numbered list indentation in long-form mode
+- Nested numbered/unordered list indentation in long-form mode
 - Empty list exit behavior
 - Heading `Enter` behavior: create a child block
 - Interstitial journal timestamp insertion
