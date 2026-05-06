@@ -1,3 +1,4 @@
+import { getSettings } from "../settings";
 import { BlockEntity, ExportOptions } from "../types";
 
 const EXPORT_DIALOG_KEY = "lf-export-dialog";
@@ -128,7 +129,7 @@ async function resolveCurrentRoot(): Promise<BlockEntity | null> {
     const tree = (await logseq.Editor.getCurrentPageBlocksTree()) as unknown as BlockEntity[] | null;
     return {
       ...currentPage,
-      content: currentPage.name ?? currentPage.content,
+      content: "",
       children: tree ?? [],
     };
   }
@@ -156,6 +157,39 @@ function escapeHtml(markdown: string): string {
     .replace(/>/g, "&gt;");
 }
 
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall through to a DOM-based copy fallback inside the Logseq host document.
+    }
+  }
+
+  const doc = parent?.document ?? document;
+  const textarea = doc.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.setAttribute("aria-hidden", "true");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents = "none";
+  textarea.style.inset = "0";
+
+  doc.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  const copied = doc.execCommand("copy");
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error("Clipboard copy failed");
+  }
+}
+
 function renderExportDialog(markdown: string): void {
   exportDialogMarkdown = markdown;
   logseq.provideUI({
@@ -169,7 +203,9 @@ function renderExportDialog(markdown: string): void {
             <strong>Markdown Export</strong>
             <button class="lf-export-icon-btn" data-on-click="closeExportDialog" aria-label="Close">×</button>
           </div>
-          <textarea class="lf-export-textarea" readonly>${escapeHtml(markdown)}</textarea>
+          <div class="lf-export-body">
+            <textarea class="lf-export-textarea" readonly>${escapeHtml(markdown)}</textarea>
+          </div>
           <div class="lf-export-actions">
             <button class="lf-export-primary" data-on-click="copyExportDialog">Copy</button>
             <button class="lf-export-secondary" data-on-click="closeExportDialog">Close</button>
@@ -181,6 +217,11 @@ function renderExportDialog(markdown: string): void {
 }
 
 export async function showExportDialog(): Promise<void> {
+  if (getSettings().directExportToClipboard) {
+    await exportCurrentToClipboard();
+    return;
+  }
+
   const markdown = await buildCurrentMarkdown();
   if (!markdown) {
     await logseq.UI.showMsg("Long Form Rebuild: no page or block available to export.", "warning");
@@ -202,8 +243,12 @@ export function closeExportDialog(): void {
 
 export async function copyExportDialog(): Promise<void> {
   if (!exportDialogMarkdown) return;
-  await navigator.clipboard.writeText(exportDialogMarkdown);
-  await logseq.UI.showMsg("Long Form Rebuild: markdown copied to clipboard.", "success");
+  try {
+    await copyText(exportDialogMarkdown);
+    await logseq.UI.showMsg("markdown has been copied into the clipboard", "success");
+  } catch {
+    await logseq.UI.showMsg("Long Form: failed to copy markdown.", "warning");
+  }
 }
 
 export async function exportCurrentToClipboard(): Promise<void> {
@@ -214,6 +259,10 @@ export async function exportCurrentToClipboard(): Promise<void> {
     return;
   }
 
-  await navigator.clipboard.writeText(markdown);
-  await logseq.UI.showMsg("Long Form Rebuild: markdown copied to clipboard.", "success");
+  try {
+    await copyText(markdown);
+    await logseq.UI.showMsg("markdown has been copied into the clipboard", "success");
+  } catch {
+    await logseq.UI.showMsg("Long Form: failed to copy markdown.", "warning");
+  }
 }

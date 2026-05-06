@@ -1,4 +1,5 @@
 import { getScopedContainer, isLongFormEnabled } from "../logseq-dom";
+import { getSettings } from "../settings";
 import { BlockEntity } from "../types";
 
 const WORD_COUNT_UI_KEY = "lf-word-count";
@@ -19,8 +20,12 @@ function stripFormatting(content: string): string {
 
 function countVisibleWords(text: string): number {
   if (!text) return 0;
-  const tokens = text.split(/\s+/).filter(Boolean);
-  return tokens.length;
+
+  const cjkMatches = text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) ?? [];
+  const latinText = text.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu, " ");
+  const latinTokens = latinText.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g) ?? [];
+
+  return cjkMatches.length + latinTokens.length;
 }
 
 function flattenBlocks(blocks: BlockEntity[], includeMetaBlocks: boolean): string[] {
@@ -76,22 +81,41 @@ export async function updateWordCount(): Promise<void> {
     return;
   }
 
+  const settings = getSettings();
+  if (!settings.showWordCount) {
+    host.innerHTML = `
+      <button class="lf-word-count-toggle" data-on-click="toggleWordCountVisibility" aria-label="Show word count" title="Show word count">
+        Count
+      </button>
+    `;
+    return;
+  }
+
   const blocks = await getCurrentBlocks();
-  const includeMetaBlocks = Boolean(logseq.settings?.showMetaBlocks);
+  const includeMetaBlocks = Boolean(settings.showMetaBlocks);
   const text = flattenBlocks(blocks, includeMetaBlocks).join(" ").trim();
   const words = countVisibleWords(text);
-  const goalRaw = Number(logseq.settings?.wordCountGoal ?? 0);
+  const goalRaw = Number(settings.wordCountGoal ?? 0);
   const goal = Number.isFinite(goalRaw) ? goalRaw : 0;
   const remaining = Math.max(goal - words, 0);
   const achieved = goal > 0 && words >= goal;
 
   host.innerHTML = `
     <div class="lf-word-count-widget ${achieved ? "is-achieved" : ""}">
-      <span class="lf-word-count-label">Words</span>
+      <span class="lf-word-count-label">Count</span>
       <strong class="lf-word-count-value">${words}</strong>
       ${goal > 0 ? `<span class="lf-word-count-goal">${achieved ? "Goal met" : `${remaining} left`}</span>` : ""}
+      <button class="lf-word-count-toggle" data-on-click="toggleWordCountVisibility" aria-label="Hide word count" title="Hide word count">
+        Hide
+      </button>
     </div>
   `;
+}
+
+export async function toggleWordCountVisibility(): Promise<void> {
+  const settings = getSettings();
+  await logseq.updateSettings({ showWordCount: !settings.showWordCount });
+  await updateWordCount();
 }
 
 export function scheduleWordCountRefresh(): void {

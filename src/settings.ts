@@ -65,6 +65,20 @@ export const settingsSchema: SettingSchemaDesc[] = [
     title: "Word count font size",
     description: "Font size in pixels for the long-form word counter widget.",
   },
+  {
+    key: "showWordCount",
+    type: "boolean",
+    default: true,
+    title: "Show word count",
+    description: "Show the floating word count widget in long-form mode.",
+  },
+  {
+    key: "directExportToClipboard",
+    type: "boolean",
+    default: false,
+    title: "Direct export to clipboard",
+    description: "When enabled, the export button copies markdown directly instead of opening the export panel.",
+  },
 ];
 
 export type PluginSettings = {
@@ -78,6 +92,8 @@ export type PluginSettings = {
   bodyBlockGap: number;
   wordCountGoal: number;
   wordCountFontSize: number;
+  showWordCount: boolean;
+  directExportToClipboard: boolean;
 };
 
 const defaultSettings: PluginSettings = {
@@ -91,6 +107,8 @@ const defaultSettings: PluginSettings = {
   bodyBlockGap: 6,
   wordCountGoal: 0,
   wordCountFontSize: 13,
+  showWordCount: true,
+  directExportToClipboard: false,
 };
 
 export function getSettings(): PluginSettings {

@@ -29,6 +29,7 @@ export function registerStyles(): void {
     style: `
   .lf-long-form {
     --lf-content-width: ${settings.contentWidth}px;
+    --lf-bullet-offset: 1.1rem;
     --lf-block-gap: ${settings.blockGap}px;
     --lf-body-block-gap: ${settings.bodyBlockGap}px;
     --lf-list-indent-step: 1.5rem;
@@ -39,8 +40,15 @@ export function registerStyles(): void {
 
   .lf-long-form .page-blocks-inner,
   .lf-long-form .blocks-container {
-    max-width: var(--lf-content-width);
+    width: min(100%, calc(var(--lf-content-width) + var(--lf-bullet-offset)));
+    max-width: calc(var(--lf-content-width) + var(--lf-bullet-offset));
     margin-inline: auto;
+  }
+
+  .lf-long-form .ls-block > .block-main-container {
+    position: relative;
+    left: calc(var(--lf-bullet-offset) * -1);
+    width: calc(100% + var(--lf-bullet-offset));
   }
 
   .lf-long-form .ls-block {
@@ -186,6 +194,23 @@ export function registerStyles(): void {
     color: transparent !important;
   }
 
+  #lf-toolbar-toggle-label svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+
+  #lf-toolbar-toggle-label {
+    line-height: 0;
+  }
+
+  #lf-toolbar-toggle-button {
+    position: relative;
+    top: -4px;
+    vertical-align: middle;
+  }
+
   #lf-word-count-root {
     position: fixed;
     right: 18px;
@@ -236,25 +261,27 @@ export function registerStyles(): void {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(15, 23, 42, 0.42);
+    background: color-mix(in srgb, var(--ls-primary-background-color, #ffffff) 28%, rgba(15, 23, 42, 0.72));
     z-index: 1400;
   }
 
   .lf-export-dialog {
     width: min(920px, calc(100vw - 48px));
     max-height: calc(100vh - 48px);
-    background: #ffffff;
-    color: #0f172a;
-    border-radius: 10px;
-    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.24);
+    background: var(--ls-primary-background-color, #ffffff);
+    color: var(--ls-primary-text-color, #0f172a);
+    border: 1px solid var(--ls-border-color, rgba(148, 163, 184, 0.24));
+    border-radius: 8px;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
     display: grid;
     grid-template-rows: auto 1fr auto;
     overflow: hidden;
   }
 
-  .dark .lf-export-dialog {
-    background: #0f172a;
-    color: #e2e8f0;
+  .lf-export-body {
+    min-height: 0;
+    overflow: hidden;
+    background: var(--ls-secondary-background-color, rgba(148, 163, 184, 0.08));
   }
 
   .lf-export-header,
@@ -264,34 +291,39 @@ export function registerStyles(): void {
     justify-content: space-between;
     gap: 12px;
     padding: 14px 16px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    background: var(--ls-primary-background-color, #ffffff);
+    border-bottom: 1px solid var(--ls-border-color, rgba(148, 163, 184, 0.18));
   }
 
   .lf-export-actions {
     justify-content: flex-end;
     border-bottom: 0;
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    border-top: 1px solid var(--ls-border-color, rgba(148, 163, 184, 0.18));
   }
 
   .lf-export-textarea {
     width: 100%;
     min-height: 420px;
-    resize: vertical;
+    height: 100%;
+    resize: none;
     border: 0;
     padding: 16px;
     font: 13px/1.65 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     background: transparent;
     color: inherit;
+    overflow: auto;
+    outline: none;
   }
 
   .lf-export-icon-btn,
   .lf-export-primary,
   .lf-export-secondary {
-    border: 0;
+    border: 1px solid var(--ls-border-color, rgba(148, 163, 184, 0.24));
     border-radius: 8px;
     padding: 8px 12px;
     cursor: pointer;
     font: inherit;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
   }
 
   .lf-export-icon-btn {
@@ -302,13 +334,23 @@ export function registerStyles(): void {
   }
 
   .lf-export-primary {
-    background: #2563eb;
-    color: white;
+    background: var(--ls-link-text-color, #2563eb);
+    border-color: var(--ls-link-text-color, #2563eb);
+    color: var(--ls-primary-background-color, #ffffff);
   }
 
   .lf-export-secondary {
-    background: rgba(148, 163, 184, 0.16);
+    background: var(--ls-secondary-background-color, rgba(148, 163, 184, 0.16));
     color: inherit;
+  }
+
+  .lf-export-icon-btn:hover,
+  .lf-export-secondary:hover {
+    background: var(--ls-tertiary-background-color, rgba(148, 163, 184, 0.22));
+  }
+
+  .lf-export-primary:hover {
+    filter: brightness(0.96);
   }
 
   ${nonHeadingIndent}

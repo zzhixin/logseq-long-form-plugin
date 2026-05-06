@@ -1,4 +1,5 @@
 import "@logseq/libs";
+import pluginIcon from "../icon.svg?raw";
 import { toggleCurrentMetaVisibility, createMetaBlock, toggleGlobalMetaVisibility } from "./features/meta-block";
 import { closeExportDialog, copyExportDialog, exportCurrentToClipboard, showExportDialog } from "./features/export-markdown";
 import { registerHeadingSync, setHeadingLevel, toggleAutoHeading } from "./features/headings";
@@ -137,8 +138,8 @@ function registerCommands(): void {
   logseq.App.registerUIItem("toolbar", {
     key: "long-form-toggle",
     template: `
-      <a class="button" data-on-click="toggleLongFormMode" title="Cycle Long Form Display Mode" style="font-size: 12px; font-weight: 600; letter-spacing: 0; padding-inline: 7px;">
-        <span id="lf-toolbar-toggle-label">大纲</span>
+      <a id="lf-toolbar-toggle-button" class="button" data-on-click="toggleLongFormMode" title="Cycle Long Form Display Mode" style="display: inline-flex; align-items: center; justify-content: center; padding-inline: 6px; font-size: 16px; line-height: 1;">
+        <span id="lf-toolbar-toggle-label" aria-label="Outline mode" style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; color: currentColor;">${pluginIcon}</span>
       </a>
     `,
   });

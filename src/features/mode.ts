@@ -4,13 +4,16 @@ import {
   type LongFormDisplayMode,
 } from "../logseq-dom";
 import { getSettings } from "../settings";
+import outlineIcon from "../../outline.svg?raw";
+import documentIcon from "../../document.svg?raw";
+import indentedDocumentIcon from "../../indented_document.svg?raw";
 
 const TOOLBAR_TOGGLE_LABEL_ID = "lf-toolbar-toggle-label";
 
-const modeLabels: Record<LongFormDisplayMode, string> = {
-  "long-no-indent": "长文",
-  "long-indent": "长文·缩进",
-  outline: "大纲",
+const modeIcons: Record<LongFormDisplayMode, string> = {
+  "long-no-indent": documentIcon,
+  "long-indent": indentedDocumentIcon,
+  outline: outlineIcon,
 };
 
 const modeTitles: Record<LongFormDisplayMode, string> = {
@@ -39,7 +42,8 @@ export function syncLongFormToolbarState(): void {
   if (!label) return;
 
   const mode = getLongFormDisplayMode();
-  label.textContent = modeLabels[mode];
+  label.innerHTML = modeIcons[mode];
+  label.setAttribute("aria-label", modeTitles[mode]);
   label.setAttribute("title", modeTitles[mode]);
 }
 
