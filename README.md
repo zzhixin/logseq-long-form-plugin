@@ -1,34 +1,31 @@
-# Long Form Rebuild
+# logseq-long-form
 
-A source-based rebuild of a Logseq long-form writing plugin.
+`logseq-long-form` is a rebuild of the classic long-form writing experience for Logseq.
 
-## Current scope
+It is designed for people who like writing in Logseq but want the page to feel less like an outliner and more like a clean draft editor, without giving up blocks, headings, lists, and page structure.
 
-Implemented in the current build:
+## What It Does
 
-- Toolbar display-mode toggle: long-form without indentation / long-form with indentation / outline
-- Long-form writing styles
-- Heading commands:
-  - toggle auto heading
-  - set heading level 1-6
-- Meta block creation and visibility toggles
-- Native numbered list rendering in long-form mode
-- Unordered list rendering for blocks starting with `- ` in long-form mode
-- Nested numbered list indentation in long-form mode
-- Nested numbered/unordered list indentation in long-form mode
-- Empty list exit behavior
-- Heading `Enter` behavior: create a child block
-- Interstitial journal timestamp insertion
-- Markdown export dialog and clipboard export
-- Floating word counter with goal and font-size setting
+When you switch into long-form mode, the page becomes easier to read and write:
 
-Not currently implemented:
+- The writing column becomes cleaner and more focused
+- Bullets and tree lines are hidden for normal paragraphs
+- Numbered lists stay visible and aligned
+- `- ` lists render properly in long-form mode
+- Nested lists keep their structure
+- Headings, meta blocks, and timestamps get special handling
+- A floating word-count widget can stay visible while you write
+- Markdown export is built in
 
-- Visual aids / threading guides
-- Layout switching
-- Keyboard shortcuts
+The top toolbar button cycles through three display modes:
 
-## Development
+- Outline
+- Long form
+- Long form with indentation
+
+## Installation
+
+1. Build the plugin:
 
 ```bash
 npm install
@@ -36,10 +33,57 @@ npm run typecheck
 npm run build
 ```
 
-Load [`dist/`](./dist) as an unpacked Logseq plugin.
+2. In Logseq, load the [`dist/`](./dist) folder as an unpacked plugin.
 
-## Notes
+## Daily Use
 
-- This project does not import or bundle the original plugin's release files.
-- The original repository contents are only reference material for behavior discovery.
-- For current status, completed features, known limitations, and restart notes, see [docs/status-summary.zh.md](./docs/status-summary.zh.md).
+After the plugin is loaded, the main things you will use are:
+
+- The toolbar mode button: switches between outline and long-form views
+- The export button: opens the Markdown export panel, or copies directly if direct export is enabled
+- The command palette: includes mode switching, heading tools, meta block tools, export, and timestamp insertion
+
+Some writing behaviors are also enhanced automatically:
+
+- Pressing `Enter` at the end of a heading creates a child block
+- Pressing `Enter` at the end of a non-empty `- ` item creates the next list item
+- Pressing `Enter` on an empty `- ` item exits the list
+
+## Settings
+
+The plugin currently includes settings for:
+
+- Display width and spacing
+- Showing or hiding timestamps
+- Showing or hiding meta blocks
+- Word-count goal and font size
+- Direct export to clipboard
+- Right-sidebar support
+
+## Markdown Export
+
+The exporter is meant to produce cleaner Markdown than raw block text.
+
+It currently:
+
+- Removes long-form-only helper tags and list properties
+- Preserves headings
+- Preserves numbered lists
+- Preserves real `- ` content where appropriate
+- Can copy directly to the clipboard without opening the export panel
+
+## Current Limitations
+
+This rebuild is already usable for real writing, but it is not trying to claim full parity with the historical plugin yet.
+
+The main known gaps are:
+
+- The original heading automation is only partially recreated
+- Some edge cases in export still need refinement
+- The old visual guide / threading UI is not included
+
+## Project Notes
+
+- This project does not bundle old release files from the original plugin
+- The original repository is used only as behavior reference
+- For detailed internal status and restart notes, see [docs/status-summary.zh.md](./docs/status-summary.zh.md)
