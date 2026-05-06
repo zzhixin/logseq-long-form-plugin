@@ -83,11 +83,7 @@ export async function updateWordCount(): Promise<void> {
 
   const settings = getSettings();
   if (!settings.showWordCount) {
-    host.innerHTML = `
-      <button class="lf-word-count-toggle" data-on-click="toggleWordCountVisibility" aria-label="Show word count" title="Show word count">
-        Count
-      </button>
-    `;
+    host.innerHTML = "";
     return;
   }
 
@@ -102,20 +98,11 @@ export async function updateWordCount(): Promise<void> {
 
   host.innerHTML = `
     <div class="lf-word-count-widget ${achieved ? "is-achieved" : ""}">
-      <span class="lf-word-count-label">Count</span>
+      <span class="lf-word-count-label">Word</span>
       <strong class="lf-word-count-value">${words}</strong>
       ${goal > 0 ? `<span class="lf-word-count-goal">${achieved ? "Goal met" : `${remaining} left`}</span>` : ""}
-      <button class="lf-word-count-toggle" data-on-click="toggleWordCountVisibility" aria-label="Hide word count" title="Hide word count">
-        Hide
-      </button>
     </div>
   `;
-}
-
-export async function toggleWordCountVisibility(): Promise<void> {
-  const settings = getSettings();
-  await logseq.updateSettings({ showWordCount: !settings.showWordCount });
-  await updateWordCount();
 }
 
 export function scheduleWordCountRefresh(): void {
