@@ -78,7 +78,11 @@ function toHeadingLevel(value: number | boolean | null, content: string): number
 }
 
 function getHeadingLevel(block: BlockEntity): number | null {
-  return toHeadingLevel(getHeadingValue(block), block.content);
+  const fromProperty = toHeadingLevel(getHeadingValue(block), block.content);
+  if (fromProperty) return fromProperty;
+
+  const markdownLevel = detectMarkdownHeading(block.content);
+  return markdownLevel && hasMarkdownHeadingText(block.content) ? markdownLevel : null;
 }
 
 async function getBlockDepth(block: BlockEntity): Promise<number> {
@@ -151,11 +155,12 @@ function getActiveEditingSnapshot(blockId: string): EditingSnapshot | null {
   const activeBlockId = activeElement.closest<HTMLElement>(".ls-block[blockid]")?.getAttribute("blockid");
   if (activeBlockId !== blockId) return null;
 
-  return {
+  const snapshot = {
     blockId,
     content: activeElement.value,
     cursorPos: activeElement.selectionStart ?? activeElement.value.length,
   };
+  return snapshot;
 }
 
 async function invokeEditorCommand(command: string): Promise<void> {
@@ -524,20 +529,174 @@ async function clearHeading(block: BlockEntity): Promise<void> {
   await logseq.Editor.removeBlockProperty(block.uuid, "heading");
 }
 
-export async function toggleAutoHeading(): Promise<void> {
-  const blocks = await getTargetBlocks();
-  if (blocks.length === 0) return;
+type AutoHeadingScope =
+  | {
+      kind: "selected";
+      blocks: BlockEntity[];
+      editingSnapshot: null;
+    }
+  | {
+      kind: "page";
+      blocks: BlockEntity[];
+      editingSnapshot: null;
+    };
+
+function flattenBlocks(blocks: BlockEntity[]): BlockEntity[] {
+  const result: BlockEntity[] = [];
+
+  const visit = (block: BlockEntity): void => {
+    result.push(block);
+    for (const child of block.children ?? []) {
+      visit(child);
+    }
+  };
 
   for (const block of blocks) {
-    const heading = getHeadingValue(block);
-    if (heading) {
-      await clearHeading(block);
+    visit(block);
+  }
+
+  return result;
+}
+
+async function getAutoHeadingScope(): Promise<AutoHeadingScope> {
+  const selected = (await logseq.Editor.getSelectedBlocks()) as BlockEntity[] | null;
+  if (selected && selected.length > 0) {
+    return {
+      kind: "selected",
+      blocks: flattenBlocks(selected),
+      editingSnapshot: null,
+    };
+  }
+
+  const pageBlocks = (await logseq.Editor.getCurrentPageBlocksTree()) as BlockEntity[] | null;
+  return {
+    kind: "page",
+    blocks: pageBlocks ? flattenBlocks(pageBlocks) : [],
+    editingSnapshot: null,
+  };
+}
+
+async function moveBlockToDepth(
+  block: BlockEntity,
+  targetDepth: number,
+  editingSnapshot: EditingSnapshot | null = null,
+): Promise<boolean> {
+  const latestBlock = ((await logseq.Editor.getBlock(block.uuid)) as BlockEntity | null) ?? block;
+  const currentDepth = await getBlockDepth(latestBlock);
+  const delta = targetDepth - currentDepth;
+  if (delta === 0) return false;
+
+  isNormalizingHeading = true;
+  try {
+    if (delta > 0) {
+      for (let index = 0; index < delta; index += 1) {
+        const previousSibling = (await logseq.Editor.getPreviousSiblingBlock(block.uuid)) as BlockEntity | null;
+        if (!previousSibling) break;
+        await runBlockCommand(block.uuid, "logseq.editor/indent");
+      }
     } else {
-      const markdownLevel = detectMarkdownHeading(block.content);
-      const inferredLevel = markdownLevel ?? Math.min(Math.max((await getBlockDepth(block)) + 1, 1), 6);
-      await applyHeading(block, inferredLevel as HeadingLevel);
+      for (let index = 0; index < Math.abs(delta); index += 1) {
+        const currentBlock = (await logseq.Editor.getBlock(block.uuid)) as BlockEntity | null;
+        if (!currentBlock?.parent?.id || currentBlock.parent.id === currentBlock.page?.id) break;
+        await runBlockCommand(block.uuid, "logseq.editor/outdent");
+      }
+    }
+  } finally {
+    isNormalizingHeading = false;
+  }
+
+  if (editingSnapshot) {
+    void reopenEditingBlock(editingSnapshot);
+  }
+
+  const finalBlock = ((await logseq.Editor.getBlock(block.uuid)) as BlockEntity | null) ?? latestBlock;
+  const finalDepth = await getBlockDepth(finalBlock);
+  return finalDepth !== currentDepth;
+}
+
+function shouldSkipAutoHeadingBlock(
+  block: BlockEntity,
+  blockMapById: Map<number, BlockEntity>,
+): boolean {
+  const parentId = block.parent?.id;
+  if (parentId == null || parentId === block.page?.id) return false;
+
+  const parentBlock = blockMapById.get(parentId);
+  if (!parentBlock) return false;
+
+  if (getHeadingLevel(block) != null) return false;
+  return getHeadingLevel(parentBlock) == null;
+}
+
+async function autoHeadingBlocks(blocks: BlockEntity[], editingSnapshot: EditingSnapshot | null = null): Promise<number> {
+  if (blocks.length === 0) return 0;
+
+  const originalBlockMapById = new Map<number, BlockEntity>();
+  for (const block of blocks) {
+    originalBlockMapById.set(block.id, block);
+  }
+
+  let changedCount = 0;
+  const headingStack: Array<{ uuid: string; level: number; depth: number }> = [];
+
+  for (const block of blocks) {
+    if (shouldSkipAutoHeadingBlock(block, originalBlockMapById)) continue;
+
+    const latestBlock = ((await logseq.Editor.getBlock(block.uuid)) as BlockEntity | null) ?? block;
+    const headingLevel = getHeadingLevel(latestBlock);
+
+    if (headingLevel != null) {
+      while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= headingLevel) {
+        headingStack.pop();
+      }
+
+      const targetDepth = headingStack.length > 0 ? headingStack[headingStack.length - 1].depth + 1 : 0;
+      const changed = await moveBlockToDepth(latestBlock, targetDepth, blocks.length === 1 ? editingSnapshot : null);
+      if (changed) {
+        changedCount += 1;
+      }
+
+      headingStack.push({
+        uuid: latestBlock.uuid,
+        level: headingLevel,
+        depth: targetDepth,
+      });
+      continue;
+    }
+
+    if (headingStack.length === 0) continue;
+
+    const targetDepth = headingStack[headingStack.length - 1].depth + 1;
+    const changed = await moveBlockToDepth(latestBlock, targetDepth, blocks.length === 1 ? editingSnapshot : null);
+    if (changed) {
+      changedCount += 1;
     }
   }
+
+  return changedCount;
+}
+
+export async function toggleAutoHeading(): Promise<void> {
+  const scope = await getAutoHeadingScope();
+  if (scope.blocks.length === 0) {
+    logseq.UI.showMsg("No blocks available for auto heading");
+    return;
+  }
+
+  await logseq.Editor.exitEditingMode?.(true);
+
+  const changedCount = await autoHeadingBlocks(scope.blocks, null);
+
+  const message =
+    scope.kind === "page"
+      ? changedCount > 0
+        ? `Auto heading adjusted ${changedCount} block${changedCount === 1 ? "" : "s"} on current page`
+        : "No heading-based changes needed on current page"
+      : changedCount > 0
+        ? `Auto heading adjusted ${changedCount} block${changedCount === 1 ? "" : "s"}`
+        : "No heading-based changes needed";
+
+  logseq.UI.showMsg(message);
 }
 
 export async function setHeadingLevel(level: HeadingLevel): Promise<void> {
@@ -572,23 +731,6 @@ async function normalizeHeadingBlocks(blocks: BlockEntity[]): Promise<number> {
   }
 
   return normalizedCount;
-}
-
-function flattenBlocks(blocks: BlockEntity[]): BlockEntity[] {
-  const result: BlockEntity[] = [];
-
-  const visit = (block: BlockEntity): void => {
-    result.push(block);
-    for (const child of block.children ?? []) {
-      visit(child);
-    }
-  };
-
-  for (const block of blocks) {
-    visit(block);
-  }
-
-  return result;
 }
 
 export async function normalizeSelectedHeadings(): Promise<void> {

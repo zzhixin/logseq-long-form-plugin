@@ -32,6 +32,7 @@ const LEGACY_PLUGIN_IDS = ["logseq-long-form-rebuild"];
 const COMMAND_KEYS = [
   "lf-toggle-mode",
   "lf-toggle-auto-heading",
+  "lf-auto-heading",
   "lf-normalize-selected-headings",
   "lf-normalize-page-headings",
   "lf-heading-1",
@@ -254,8 +255,8 @@ function registerCommands(): void {
 
   logseq.App.registerCommandPalette(
     {
-      key: "lf-toggle-auto-heading",
-      label: "Long Form: Toggle auto heading",
+      key: "lf-auto-heading",
+      label: "Long Form: Auto heading",
     },
     toggleAutoHeading,
   );
@@ -335,7 +336,7 @@ function registerCommands(): void {
     insertInterstitialJournalStamp,
   );
 
-  logseq.Editor.registerBlockContextMenuItem("Long Form: Toggle auto heading", toggleAutoHeading);
+  logseq.Editor.registerBlockContextMenuItem("Long Form: Auto heading", toggleAutoHeading);
   logseq.Editor.registerBlockContextMenuItem("Long Form: Normalize selected/current headings", normalizeSelectedHeadings);
   logseq.Editor.registerBlockContextMenuItem("Long Form: Create meta block", createMetaBlock);
   logseq.Editor.registerBlockContextMenuItem("Long Form: Toggle current meta", toggleCurrentMetaVisibility);
