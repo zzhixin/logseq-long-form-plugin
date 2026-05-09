@@ -182,6 +182,18 @@ export function registerStyles(): void {
     opacity: 1 !important;
   }
 
+  .lf-long-form .ls-block[data-lf-ordered-list],
+  .lf-long-form .ls-block[data-lf-unordered-list] {
+    margin-bottom: 0 !important;
+  }
+
+  .lf-long-form .ls-block[data-lf-ordered-list] > .block-main-container > .block-content-wrapper,
+  .lf-long-form .ls-block[data-lf-ordered-list] > .block-main-container > .editor-wrapper,
+  .lf-long-form .ls-block[data-lf-unordered-list] > .block-main-container > .block-content-wrapper,
+  .lf-long-form .ls-block[data-lf-unordered-list] > .block-main-container > .editor-wrapper {
+    padding-block: 0 !important;
+  }
+
   .lf-long-form:not(.lf-keep-indents) .ls-block[data-lf-ordered-list] > .block-main-container > .block-control-wrap {
     margin-left: calc(var(--lf-bullet-offset) + 0.2rem) !important;
   }
