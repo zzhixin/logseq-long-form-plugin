@@ -80,7 +80,8 @@ function removeUnorderedPrefix(content: string): string {
 }
 
 function canMirrorUnorderedContent(content: string): boolean {
-  return !content.includes("`");
+  void content;
+  return false;
 }
 
 function debugList(message: string, details?: Record<string, unknown>): void {
@@ -298,6 +299,8 @@ function markUnorderedEditingState(textarea: HTMLTextAreaElement): void {
 async function markListState(block: BlockEntity, listDepth = 0): Promise<void> {
   const element = parent?.document?.querySelector<HTMLElement>(`.ls-block[blockid="${block.uuid}"]`);
   if (!element) return;
+  const container = element.closest<HTMLElement>(".lf-long-form");
+  const effectiveListDepth = container?.classList.contains("lf-keep-indents") ? 0 : listDepth;
 
   const treeValue = readOrderedListTypeFromTree(block);
   const apiValue = await readOrderedListTypeFromApi(block.uuid);
@@ -306,7 +309,7 @@ async function markListState(block: BlockEntity, listDepth = 0): Promise<void> {
   if (isOrderedListValue(apiValue) || isOrderedListValue(treeValue)) {
     element.setAttribute(ORDERED_LIST_ATTRIBUTE, "true");
     clearUnorderedListState(element);
-    setListDepth(element, listDepth);
+    setListDepth(element, effectiveListDepth);
     return;
   }
 
@@ -322,7 +325,7 @@ async function markListState(block: BlockEntity, listDepth = 0): Promise<void> {
       hideRenderedUnorderedPrefix(element);
     }
     setUnorderedListText(element, content);
-    setListDepth(element, listDepth);
+    setListDepth(element, effectiveListDepth);
     return;
   }
 
@@ -516,8 +519,98 @@ export function syncExistingListMarkers(): void {
   void syncOrderedListMarkers();
 }
 
+function getVisibleBlockIds(): string[] {
+  const elements = parent?.document?.querySelectorAll<HTMLElement>(".ls-block[blockid]");
+  if (!elements) return [];
+
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const element of Array.from(elements)) {
+    const blockId = element.getAttribute("blockid");
+    if (!blockId || seen.has(blockId)) continue;
+    seen.add(blockId);
+    ids.push(blockId);
+  }
+
+  return ids;
+}
+
+async function loadBlocksByIds(blockIds: string[]): Promise<Map<string, BlockEntity>> {
+  const blocks = new Map<string, BlockEntity>();
+
+  await Promise.all(
+    blockIds.map(async (blockId) => {
+      const block = (await logseq.Editor.getBlock(blockId)) as BlockEntity | null;
+      if (block) {
+        blocks.set(block.uuid, block);
+      }
+    }),
+  );
+
+  return blocks;
+}
+
+async function computeListDepthFromParents(
+  block: BlockEntity,
+  blockCache: Map<string, BlockEntity>,
+  depthCache: Map<string, number>,
+): Promise<number> {
+  const cached = depthCache.get(block.uuid);
+  if (cached != null) return cached;
+
+  const parentId = block.parent?.id;
+  if (parentId == null || parentId === block.page?.id) {
+    depthCache.set(block.uuid, 0);
+    return 0;
+  }
+
+  let parentBlock =
+    Array.from(blockCache.values()).find((candidate) => candidate.id === parentId) ?? null;
+
+  if (!parentBlock) {
+    parentBlock = (await logseq.Editor.getBlock(parentId)) as BlockEntity | null;
+    if (parentBlock) {
+      blockCache.set(parentBlock.uuid, parentBlock);
+    }
+  }
+
+  if (!parentBlock) {
+    depthCache.set(block.uuid, 0);
+    return 0;
+  }
+
+  const parentDepth = await computeListDepthFromParents(parentBlock, blockCache, depthCache);
+  const parentListType = readOrderedListTypeFromTree(parentBlock) ?? (await readOrderedListTypeFromApi(parentBlock.uuid));
+  const parentIsList = isOrderedListValue(parentListType) || isUnorderedListContent(getEffectiveBlockContent(parentBlock));
+  const depth = parentIsList ? parentDepth + 1 : parentDepth;
+
+  depthCache.set(block.uuid, depth);
+  return depth;
+}
+
+async function syncOrderedListMarkersFromVisibleBlocks(): Promise<void> {
+  const visibleBlockIds = getVisibleBlockIds();
+  if (visibleBlockIds.length === 0) return;
+
+  const blockCache = await loadBlocksByIds(visibleBlockIds);
+  const depthCache = new Map<string, number>();
+
+  for (const blockId of visibleBlockIds) {
+    const block = blockCache.get(blockId);
+    if (!block) continue;
+
+    const listDepth = await computeListDepthFromParents(block, blockCache, depthCache);
+    await markListState(block, listDepth);
+  }
+}
+
 export async function syncOrderedListMarkers(): Promise<void> {
   const blocks = (await logseq.Editor.getCurrentPageBlocksTree()) as unknown as BlockEntity[] | null;
+
+  if (!blocks || blocks.length === 0) {
+    await syncOrderedListMarkersFromVisibleBlocks();
+    return;
+  }
 
   const visit = async (block: BlockEntity, listDepth: number): Promise<void> => {
     const listType = readOrderedListTypeFromTree(block) ?? (await readOrderedListTypeFromApi(block.uuid));

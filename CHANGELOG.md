@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1
+
+- Added release-ready README polish, including an animated preview
+- Refined long-form list alignment so indented and non-indented modes behave more consistently
+- Fixed ordered and unordered list rendering edge cases in Home and long-form views
+- Fixed markdown export so ordered lists keep sibling numbering instead of resetting every item to `1.`
+- Improved markdown export markers for nested ordered lists
+
 ## 0.2.0
 
 - Renamed the plugin package and Logseq id to `logseq-long-form-plugin`

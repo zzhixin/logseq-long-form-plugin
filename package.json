@@ -1,6 +1,6 @@
 {
   "name": "logseq-long-form-plugin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "A rebuilt long-form writing experience for Logseq with cleaner reading modes, heading-aware structure helpers, list polishing, and markdown export.",
   "type": "module",

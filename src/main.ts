@@ -14,7 +14,8 @@ import { registerListEnhancements } from "./features/lists";
 import { toggleLongFormMode } from "./features/mode";
 import { refreshRuntimeState, registerRuntimeSync } from "./features/runtime-sync";
 import { registerWordCountListeners } from "./features/word-count";
-import { settingsSchema } from "./settings";
+import { getLongFormDisplayMode } from "./logseq-dom";
+import { isDebugLoggingEnabled, settingsSchema } from "./settings";
 import { registerStyles } from "./styles";
 
 type LogseqWithInternalApi = typeof logseq & {
@@ -24,6 +25,7 @@ type LogseqWithInternalApi = typeof logseq & {
 type ProbeWindow = Window &
   typeof globalThis & {
     __lfPluginCleanup?: () => void | Promise<void>;
+    __lfDebugIndent?: () => void;
   };
 
 const LEGACY_PLUGIN_IDS = ["logseq-long-form-rebuild"];
@@ -53,6 +55,15 @@ function cleanupLegacyUi(): void {
     reset: true,
     template: "",
   });
+}
+
+function debugMain(message: string, details?: unknown): void {
+  if (!isDebugLoggingEnabled()) return;
+  if (details === undefined) {
+    console.info(message);
+    return;
+  }
+  console.info(message, details);
 }
 
 function getCleanupWindow(): ProbeWindow {
@@ -389,6 +400,106 @@ function installDomHooks(): Array<() => void> {
   return cleanups;
 }
 
+function installIndentDiagnostics(): () => void {
+  if (!isDebugLoggingEnabled()) return () => undefined;
+  const isElementLike = (value: unknown): value is Element =>
+    Boolean(value && typeof value === "object" && "nodeType" in (value as Record<string, unknown>));
+
+  const isHtmlElementLike = (value: unknown): value is HTMLElement =>
+    Boolean(isElementLike(value) && "className" in (value as unknown as Record<string, unknown>));
+
+  const printIndentDiagnostics = (): void => {
+    const parentDoc = parent?.document;
+    if (!parentDoc) {
+      debugMain("[long-form:indent] container unavailable");
+      return;
+    }
+
+    const activeBlock =
+      parentDoc.activeElement?.closest?.(".ls-block[blockid]") ??
+      parentDoc.querySelector(".ls-block[blockid] .block-editor")?.closest(".ls-block[blockid]") ??
+      parentDoc.querySelector(".ls-block[data-lf-ordered-list][data-lf-list-depth='1']") ??
+      parentDoc.querySelector(".ls-block[data-lf-unordered-list][data-lf-list-depth='1']") ??
+      parentDoc.querySelector(".ls-block[data-lf-ordered-list]") ??
+      parentDoc.querySelector(".ls-block[data-lf-unordered-list]") ??
+      null;
+
+    const targetBlock = (isHtmlElementLike(activeBlock) ? activeBlock : null) as HTMLElement | null;
+
+    const describeElement = (element: Element | null, label: string) => {
+      if (!isHtmlElementLike(element)) {
+        return { label, found: false };
+      }
+
+      const style = parentDoc.defaultView?.getComputedStyle(element);
+      return {
+        label,
+        found: true,
+        className: element.className,
+        marginLeft: style?.marginLeft,
+        paddingLeft: style?.paddingLeft,
+        width: style?.width,
+        left: style?.left,
+        position: style?.position,
+        transform: style?.transform,
+      };
+    };
+
+    debugMain("[long-form:indent] snapshot", JSON.stringify({
+      mode: getLongFormDisplayMode(),
+      activeBlockId: targetBlock?.getAttribute?.("blockid") ?? null,
+      targetBlockLevel: targetBlock?.getAttribute?.("level") ?? null,
+      targetBlockDataHeading: targetBlock?.getAttribute?.("data-heading") ?? null,
+      targetBlockListDepth: targetBlock?.getAttribute?.("data-lf-list-depth") ?? null,
+      targetBlockOrdered: targetBlock?.getAttribute?.("data-lf-ordered-list") ?? null,
+      targetBlockUnordered: targetBlock?.getAttribute?.("data-lf-unordered-list") ?? null,
+      targetBlockClasses: targetBlock?.className ?? null,
+      blockMainContainer: describeElement(
+        targetBlock?.querySelector?.(":scope > .block-main-container") ?? null,
+        "blockMainContainer",
+      ),
+      blockControlWrap: describeElement(
+        targetBlock?.querySelector?.(":scope > .block-main-container > .block-control-wrap") ?? null,
+        "blockControlWrap",
+      ),
+      blockContentWrapper: describeElement(
+        targetBlock?.querySelector?.(":scope > .block-main-container > .block-content-wrapper") ?? null,
+        "blockContentWrapper",
+      ),
+      blockContentOrEditorInner: describeElement(
+        targetBlock?.querySelector?.(":scope > .block-main-container > .block-content-or-editor-inner") ?? null,
+        "blockContentOrEditorInner",
+      ),
+      parentChildrenContainer: describeElement(
+        targetBlock?.parentElement?.closest(".block-children-container") ?? null,
+        "parentChildrenContainer",
+      ),
+      nearestBlocksContainer: describeElement(
+        targetBlock?.closest(".blocks-container") ?? null,
+        "nearestBlocksContainer",
+      ),
+    }));
+  };
+
+  const probeWindow = window as ProbeWindow;
+  const parentWindow = (window.parent ?? window) as ProbeWindow;
+  const topWindow = (window.top ?? window) as ProbeWindow;
+  const cleanupWindow = getCleanupWindow();
+
+  probeWindow.__lfDebugIndent = printIndentDiagnostics;
+  parentWindow.__lfDebugIndent = printIndentDiagnostics;
+  topWindow.__lfDebugIndent = printIndentDiagnostics;
+  cleanupWindow.__lfDebugIndent = printIndentDiagnostics;
+  debugMain("logseq-long-form indent diagnostics ready");
+
+  return () => {
+    delete probeWindow.__lfDebugIndent;
+    delete parentWindow.__lfDebugIndent;
+    delete topWindow.__lfDebugIndent;
+    delete cleanupWindow.__lfDebugIndent;
+  };
+}
+
 function installGlobalCleanup(cleanups: Array<() => void>): void {
   const cleanupWindow = getCleanupWindow();
   cleanupWindow.__lfPluginCleanup = () => {
@@ -415,6 +526,7 @@ async function main(): Promise<void> {
   registerCommands();
   installSettingsHooks();
   const cleanups = installDomHooks();
+  cleanups.push(installIndentDiagnostics());
   installGlobalCleanup(cleanups);
   refreshRuntimeState();
 }

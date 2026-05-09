@@ -79,14 +79,91 @@ function renderLine(line: string, depth: number): string {
   return `${linePrefix(trimmed, depth)}${trimmed}`;
 }
 
-function renderOrderedListLine(line: string, depth: number): string {
-  const trimmed = line.trim();
-  if (!trimmed) return "";
-  if (/^\d+\.\s+/.test(trimmed)) return `${"  ".repeat(depth)}${trimmed}`;
-  return `${"  ".repeat(depth)}1. ${trimmed}`;
+function toAlphabeticIndex(index: number): string {
+  let value = Math.max(index, 1);
+  let result = "";
+
+  while (value > 0) {
+    value -= 1;
+    result = String.fromCharCode(97 + (value % 26)) + result;
+    value = Math.floor(value / 26);
+  }
+
+  return result;
 }
 
-function blockToMarkdown(block: BlockEntity, depth: number, options: ExportOptions): string[] {
+function toRomanNumeral(index: number): string {
+  let value = Math.max(index, 1);
+  const numerals: Array<[number, string]> = [
+    [1000, "m"],
+    [900, "cm"],
+    [500, "d"],
+    [400, "cd"],
+    [100, "c"],
+    [90, "xc"],
+    [50, "l"],
+    [40, "xl"],
+    [10, "x"],
+    [9, "ix"],
+    [5, "v"],
+    [4, "iv"],
+    [1, "i"],
+  ];
+
+  let result = "";
+  for (const [amount, numeral] of numerals) {
+    while (value >= amount) {
+      result += numeral;
+      value -= amount;
+    }
+  }
+
+  return result || "i";
+}
+
+function orderedListMarker(listLevel: number, index: number): string {
+  const level = ((listLevel - 1) % 3 + 3) % 3;
+  if (level === 1) return `${toAlphabeticIndex(index)}.`;
+  if (level === 2) return `${toRomanNumeral(index)}.`;
+  return `${index}.`;
+}
+
+function renderOrderedListLine(line: string, depth: number, listLevel: number, index: number): string {
+  const trimmed = line.trim();
+  if (!trimmed) return "";
+  const normalized = trimmed.replace(/^\d+\.\s+/, "");
+  return `${"  ".repeat(depth)}${orderedListMarker(listLevel, index)} ${normalized}`;
+}
+
+function renderChildrenToMarkdown(
+  children: BlockEntity[] | undefined,
+  depth: number,
+  options: ExportOptions,
+  parentListLevel: number,
+): string[] {
+  if (!children || children.length === 0) return [];
+
+  const lines: string[] = [];
+  let orderedIndex = 0;
+
+  for (const child of children) {
+    const isOrdered = getOrderListType(child) === "number";
+    const isUnordered = /^-\s/.test(normalizeContent(child.content));
+    const childListLevel = isOrdered || isUnordered ? parentListLevel + 1 : parentListLevel;
+    orderedIndex = isOrdered ? orderedIndex + 1 : 0;
+    lines.push(...blockToMarkdown(child, depth, options, childListLevel, isOrdered ? orderedIndex : null));
+  }
+
+  return lines;
+}
+
+function blockToMarkdown(
+  block: BlockEntity,
+  depth: number,
+  options: ExportOptions,
+  listLevel = 0,
+  orderedIndex: number | null = null,
+): string[] {
   const isMeta = block.content.includes("#.meta-block");
   if (isMeta && !options.includeMetaBlocks) return [];
 
@@ -109,16 +186,14 @@ function blockToMarkdown(block: BlockEntity, depth: number, options: ExportOptio
       }
     } else {
       const [first, ...rest] = contentLines;
-      lines.push(orderListType === "number" ? renderOrderedListLine(first, depth) : renderLine(first, depth));
+      lines.push(orderListType === "number" ? renderOrderedListLine(first, depth, listLevel, orderedIndex ?? 1) : renderLine(first, depth));
       for (const line of rest) {
         lines.push(`${"  ".repeat(depth + 1)}${line.trim()}`);
       }
     }
   }
 
-  for (const child of block.children ?? []) {
-    lines.push(...blockToMarkdown(child as BlockEntity, childDepth, options));
-  }
+  lines.push(...renderChildrenToMarkdown(block.children as BlockEntity[] | undefined, childDepth, options, listLevel));
 
   return lines;
 }

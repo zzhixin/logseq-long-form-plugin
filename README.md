@@ -4,6 +4,8 @@ Long Form Plugin is a rebuilt long-form writing experience for Logseq.
 
 It is for people who like drafting in Logseq, but want pages to feel closer to a focused editor than a raw outliner, without giving up blocks, headings, lists, and page structure.
 
+![comparison](comparison.png)
+
 ## Why This Plugin Exists
 
 This plugin was built primarily to better support the indented long-form writing mode.
@@ -30,6 +32,13 @@ This rebuild is meant to make that workflow easier and more reliable by giving t
 - Floating word-count widget
 - Markdown export and direct copy to clipboard
 - Meta block helpers and interstitial timestamp insertion
+
+![Animated preview of the three writing modes in Long Form Plugin](logseq-long-form-plugin-illustration.gif)
+
+
+## Preview
+
+The GIF above shows the plugin switching among the three display modes while preserving the same Logseq page structure.
 
 ## Installation
 
@@ -90,6 +99,8 @@ This repo is now in a good state for preview use and wider testing:
 - Heading enter behavior works in normal writing flow
 - Unordered list rendering is much cleaner, including inline code cases
 - Debug logging is available, but off by default
+
+For publishing workflow notes, see [docs/marketplace-submission.md](./docs/marketplace-submission.md).
 
 ## Project Notes
 

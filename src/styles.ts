@@ -11,10 +11,11 @@ export function registerStyles(): void {
     margin-left: 0 !important;
   }
 
-  .lf-long-form:not(.lf-keep-indents) .ls-block:not([data-heading="true"]):not(:has(> .block-main-container :is(h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6))) > .block-children-container > .block-children > .ls-block > .block-main-container {
-    left: 0 !important;
-    width: 100% !important;
-  }`
+.lf-long-form:not(.lf-keep-indents) .ls-block:not([data-heading="true"]):not(:has(> .block-main-container :is(h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6))) > .block-children-container {
+  margin-left: 29px !important;
+}
+
+`
     : "";
   const resetAllChildrenIndent = !settings.indentNonHeadingChildren
     ? `
@@ -181,12 +182,17 @@ export function registerStyles(): void {
     opacity: 1 !important;
   }
 
-  .lf-long-form .ls-block[data-lf-ordered-list] > .block-main-container > .block-control-wrap {
-    margin-left: calc(1.6rem + (var(${ "--lf-list-depth" }, 0) * var(--lf-list-indent-step))) !important;
+  .lf-long-form:not(.lf-keep-indents) .ls-block[data-lf-ordered-list] > .block-main-container > .block-control-wrap {
+    margin-left: calc(var(--lf-bullet-offset) + 0.2rem) !important;
   }
 
-  .lf-long-form .ls-block[data-lf-unordered-list] > .block-main-container > .block-control-wrap {
-    margin-left: calc(1.6rem + (var(${ "--lf-list-depth" }, 0) * var(--lf-list-indent-step))) !important;
+  .lf-long-form:not(.lf-keep-indents) .ls-block[data-lf-unordered-list] > .block-main-container > .block-control-wrap {
+    margin-left: calc(var(--lf-bullet-offset) + 0.2rem) !important;
+  }
+
+  .lf-long-form.lf-keep-indents .ls-block[data-lf-ordered-list] > .block-main-container > .block-control-wrap,
+  .lf-long-form.lf-keep-indents .ls-block[data-lf-unordered-list] > .block-main-container > .block-control-wrap {
+    margin-left: calc(var(--lf-bullet-offset) + 0.2rem) !important;
   }
 
   .lf-long-form .ls-block[data-lf-unordered-prefix] > .block-main-container > .block-content-or-editor-inner > .block-row > .block-content-wrapper,
