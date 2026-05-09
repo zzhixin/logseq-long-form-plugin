@@ -1,10 +1,10 @@
 {
-  "name": "logseq-long-form",
-  "version": "0.1.0",
+  "name": "logseq-long-form-plugin",
+  "version": "0.2.0",
   "main": "index.html",
   "logseq": {
-    "id": "logseq-long-form",
-    "title": "logseq-long-form",
+    "id": "logseq-long-form-plugin",
+    "title": "Long Form Plugin",
     "icon": "./icon.svg"
   }
 }

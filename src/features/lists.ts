@@ -1,4 +1,5 @@
 import { isLongFormEnabled } from "../logseq-dom";
+import { isDebugLoggingEnabled } from "../settings";
 import { BlockEntity } from "../types";
 import { isHeadingBlock } from "./headings";
 
@@ -6,6 +7,8 @@ const ORDERED_LIST_ATTRIBUTE = "data-lf-ordered-list";
 const UNORDERED_LIST_ATTRIBUTE = "data-lf-unordered-list";
 const UNORDERED_PREFIX_ATTRIBUTE = "data-lf-unordered-prefix";
 const UNORDERED_TEXT_ATTRIBUTE = "data-lf-unordered-text";
+const UNORDERED_PREFIX_HIDDEN_ATTRIBUTE = "data-lf-unordered-prefix-hidden";
+const UNORDERED_PREFIX_ORIGINAL_ATTRIBUTE = "data-lf-unordered-prefix-original";
 const LIST_DEPTH_STYLE_PROPERTY = "--lf-list-depth";
 const LIST_DEBUG_PREFIX = "[long-form:list]";
 const unorderedExitLocks = new Set<string>();
@@ -76,7 +79,12 @@ function removeUnorderedPrefix(content: string): string {
   return content.replace(/^-\s?/, "");
 }
 
+function canMirrorUnorderedContent(content: string): boolean {
+  return !content.includes("`");
+}
+
 function debugList(message: string, details?: Record<string, unknown>): void {
+  if (!isDebugLoggingEnabled()) return;
   console.info(LIST_DEBUG_PREFIX, message, details ?? {});
 }
 
@@ -171,6 +179,7 @@ function clearUnorderedListState(element: HTMLElement): void {
   element.removeAttribute(UNORDERED_LIST_ATTRIBUTE);
   element.removeAttribute(UNORDERED_PREFIX_ATTRIBUTE);
   element.removeAttribute(UNORDERED_TEXT_ATTRIBUTE);
+  restoreRenderedUnorderedPrefix(element);
   for (const wrapper of getBlockContentWrappers(element)) {
     wrapper.removeAttribute(UNORDERED_TEXT_ATTRIBUTE);
   }
@@ -187,6 +196,74 @@ function getBlockContentWrappers(element: HTMLElement): HTMLElement[] {
       ].join(", "),
     ),
   );
+}
+
+function getRenderedBlockContents(element: HTMLElement): HTMLElement[] {
+  return Array.from(
+    element.querySelectorAll<HTMLElement>(
+      [
+        ":scope > .block-main-container > .block-content-wrapper .block-content",
+        ":scope > .block-main-container > .block-content-or-editor-inner > .block-row > .block-content-wrapper .block-content",
+      ].join(", "),
+    ),
+  );
+}
+
+function getLeadingTextNode(element: HTMLElement): Text | null {
+  const documentRef = element.ownerDocument;
+  const walker = documentRef.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parentElement = node.parentElement;
+      if (!parentElement) return NodeFilter.FILTER_REJECT;
+      if (!element.contains(parentElement)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  let currentNode = walker.nextNode();
+  while (currentNode) {
+    if (currentNode.nodeType === Node.TEXT_NODE) {
+      const text = currentNode.textContent ?? "";
+      if (text.trim().length > 0) {
+        return currentNode as Text;
+      }
+    }
+    currentNode = walker.nextNode();
+  }
+
+  return null;
+}
+
+function hideRenderedUnorderedPrefix(element: HTMLElement): void {
+  for (const contentElement of getRenderedBlockContents(element)) {
+    if (contentElement.getAttribute(UNORDERED_PREFIX_HIDDEN_ATTRIBUTE) === "true") continue;
+
+    const textNode = getLeadingTextNode(contentElement);
+    const text = textNode?.textContent ?? "";
+    const match = text.match(/^\s*-\s/);
+    if (!match) continue;
+
+    contentElement.setAttribute(UNORDERED_PREFIX_HIDDEN_ATTRIBUTE, "true");
+    contentElement.setAttribute(UNORDERED_PREFIX_ORIGINAL_ATTRIBUTE, match[0]);
+    textNode!.textContent = text.slice(match[0].length);
+  }
+}
+
+function restoreRenderedUnorderedPrefix(element: HTMLElement): void {
+  for (const contentElement of getRenderedBlockContents(element)) {
+    const originalPrefix = contentElement.getAttribute(UNORDERED_PREFIX_ORIGINAL_ATTRIBUTE);
+    if (!originalPrefix) continue;
+
+    const textNode = getLeadingTextNode(contentElement);
+    if (textNode) {
+      textNode.textContent = `${originalPrefix}${textNode.textContent ?? ""}`;
+    } else {
+      contentElement.prepend(originalPrefix);
+    }
+
+    contentElement.removeAttribute(UNORDERED_PREFIX_HIDDEN_ATTRIBUTE);
+    contentElement.removeAttribute(UNORDERED_PREFIX_ORIGINAL_ATTRIBUTE);
+  }
 }
 
 function setUnorderedListText(element: HTMLElement, content: string): void {
@@ -207,8 +284,15 @@ function markUnorderedEditingState(textarea: HTMLTextAreaElement): void {
   }
 
   block.setAttribute(UNORDERED_LIST_ATTRIBUTE, "true");
-  block.setAttribute(UNORDERED_PREFIX_ATTRIBUTE, "true");
-  setUnorderedListText(block, textarea.value);
+  if (canMirrorUnorderedContent(textarea.value)) {
+    restoreRenderedUnorderedPrefix(block);
+    block.setAttribute(UNORDERED_PREFIX_ATTRIBUTE, "true");
+    setUnorderedListText(block, textarea.value);
+  } else {
+    block.removeAttribute(UNORDERED_PREFIX_ATTRIBUTE);
+    setUnorderedListText(block, textarea.value);
+    hideRenderedUnorderedPrefix(block);
+  }
 }
 
 async function markListState(block: BlockEntity, listDepth = 0): Promise<void> {
@@ -230,7 +314,13 @@ async function markListState(block: BlockEntity, listDepth = 0): Promise<void> {
 
   if (isUnorderedListContent(content)) {
     element.setAttribute(UNORDERED_LIST_ATTRIBUTE, "true");
-    element.setAttribute(UNORDERED_PREFIX_ATTRIBUTE, "true");
+    if (canMirrorUnorderedContent(content)) {
+      restoreRenderedUnorderedPrefix(element);
+      element.setAttribute(UNORDERED_PREFIX_ATTRIBUTE, "true");
+    } else {
+      element.removeAttribute(UNORDERED_PREFIX_ATTRIBUTE);
+      hideRenderedUnorderedPrefix(element);
+    }
     setUnorderedListText(element, content);
     setListDepth(element, listDepth);
     return;
@@ -339,7 +429,7 @@ async function insertSpaceAfterUnorderedMarker(blockId: string): Promise<boolean
       return true;
     } catch (error) {
       if (attempt === 8) {
-        console.info("[long-form:list] unordered enter space insert failed", {
+        debugList("unordered enter space insert failed", {
           blockId,
           attempt,
           textareaValue: textarea.value,
@@ -351,7 +441,7 @@ async function insertSpaceAfterUnorderedMarker(blockId: string): Promise<boolean
     }
   }
 
-  console.info("[long-form:list] unordered enter space insert skipped: editor not ready", { blockId });
+  debugList("unordered enter space insert skipped: editor not ready", { blockId });
   return false;
 }
 
@@ -373,7 +463,7 @@ async function handleHeadingEnter(event: KeyboardEvent): Promise<void> {
 
   const headingProperty = await logseq.Editor.getBlockProperty(blockId, "heading");
   const headingByProperty = headingProperty === true || typeof headingProperty === "number";
-  const headingByMarkdown = /^#{1,6}\s+/.test(target.value);
+  const headingByMarkdown = /^#{1,6}\s+\S/.test(target.value);
   if (!headingByProperty && !headingByMarkdown && !isHeadingBlock(current)) return;
 
   event.preventDefault();
@@ -447,15 +537,24 @@ export async function syncOrderedListMarkers(): Promise<void> {
   }
 }
 
-export function registerListEnhancements(): void {
+export function registerListEnhancements(): () => void {
   const parentDoc = parent?.document;
-  if (!parentDoc) return;
+  if (!parentDoc) return () => undefined;
 
   parentDoc.addEventListener("focusin", onFocusIn, true);
   parentDoc.addEventListener("input", onInput, true);
   parentDoc.addEventListener("keydown", onKeyDown, true);
 
-  logseq.DB.onChanged(() => {
+  const unsubscribe = logseq.DB.onChanged(() => {
     void syncOrderedListMarkers();
   });
+
+  return () => {
+    parentDoc.removeEventListener("focusin", onFocusIn, true);
+    parentDoc.removeEventListener("input", onInput, true);
+    parentDoc.removeEventListener("keydown", onKeyDown, true);
+    if (typeof unsubscribe === "function") {
+      unsubscribe();
+    }
+  };
 }

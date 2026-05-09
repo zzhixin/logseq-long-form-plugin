@@ -79,6 +79,13 @@ export const settingsSchema: SettingSchemaDesc[] = [
     title: "Direct export to clipboard",
     description: "When enabled, the export button copies markdown directly instead of opening the export panel.",
   },
+  {
+    key: "debugLogging",
+    type: "boolean",
+    default: false,
+    title: "Debug logging",
+    description: "Enable verbose console logging for long-form debugging. Reload the plugin after changing this setting.",
+  },
 ];
 
 export type PluginSettings = {
@@ -94,6 +101,7 @@ export type PluginSettings = {
   wordCountFontSize: number;
   showWordCount: boolean;
   directExportToClipboard: boolean;
+  debugLogging: boolean;
 };
 
 const defaultSettings: PluginSettings = {
@@ -109,6 +117,7 @@ const defaultSettings: PluginSettings = {
   wordCountFontSize: 13,
   showWordCount: true,
   directExportToClipboard: false,
+  debugLogging: false,
 };
 
 export function getSettings(): PluginSettings {
@@ -116,4 +125,8 @@ export function getSettings(): PluginSettings {
     ...defaultSettings,
     ...(logseq.settings ?? {}),
   };
+}
+
+export function isDebugLoggingEnabled(): boolean {
+  return Boolean(getSettings().debugLogging);
 }

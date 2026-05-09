@@ -2,20 +2,49 @@ import "@logseq/libs";
 import pluginIcon from "../icon.svg?raw";
 import { toggleCurrentMetaVisibility, createMetaBlock, toggleGlobalMetaVisibility } from "./features/meta-block";
 import { closeExportDialog, copyExportDialog, exportCurrentToClipboard, showExportDialog } from "./features/export-markdown";
-import { registerHeadingSync, setHeadingLevel, toggleAutoHeading } from "./features/headings";
+import {
+  normalizeCurrentPageHeadings,
+  normalizeSelectedHeadings,
+  registerHeadingSync,
+  setHeadingLevel,
+  toggleAutoHeading,
+} from "./features/headings";
 import { insertInterstitialJournalStamp } from "./features/journal";
 import { registerListEnhancements } from "./features/lists";
 import { toggleLongFormMode } from "./features/mode";
 import { refreshRuntimeState, registerRuntimeSync } from "./features/runtime-sync";
 import { registerWordCountListeners } from "./features/word-count";
-import { getSettings, settingsSchema } from "./settings";
+import { settingsSchema } from "./settings";
 import { registerStyles } from "./styles";
 
 type LogseqWithInternalApi = typeof logseq & {
   _execCallableAPIAsync?: (method: string, ...args: unknown[]) => Promise<unknown>;
 };
 
+type ProbeWindow = Window &
+  typeof globalThis & {
+    __lfPluginCleanup?: () => void | Promise<void>;
+  };
+
 const LEGACY_PLUGIN_IDS = ["logseq-long-form-rebuild"];
+const COMMAND_KEYS = [
+  "lf-toggle-mode",
+  "lf-toggle-auto-heading",
+  "lf-normalize-selected-headings",
+  "lf-normalize-page-headings",
+  "lf-heading-1",
+  "lf-heading-2",
+  "lf-heading-3",
+  "lf-heading-4",
+  "lf-heading-5",
+  "lf-heading-6",
+  "lf-create-meta-block",
+  "lf-toggle-current-meta",
+  "lf-toggle-global-meta",
+  "lf-export-markdown",
+  "lf-copy-markdown",
+  "lf-interstitial-journal",
+] as const;
 
 function cleanupLegacyUi(): void {
   logseq.provideUI({
@@ -24,6 +53,25 @@ function cleanupLegacyUi(): void {
     reset: true,
     template: "",
   });
+}
+
+function getCleanupWindow(): ProbeWindow {
+  return (window.top ?? window.parent ?? window) as ProbeWindow;
+}
+
+function runPreviousPluginCleanup(): void {
+  const cleanupWindow = getCleanupWindow();
+  const previousCleanup = cleanupWindow.__lfPluginCleanup;
+  if (typeof previousCleanup !== "function") return;
+
+  try {
+    const result = previousCleanup();
+    if (result && typeof (result as Promise<void>).then === "function") {
+      void (result as Promise<void>).catch(() => undefined);
+    }
+  } catch {
+    // Best effort cleanup for previous runtime instance.
+  }
 }
 
 async function cleanupRegisteredCommands(): Promise<void> {
@@ -44,9 +92,139 @@ async function cleanupRegisteredCommands(): Promise<void> {
   }
 }
 
+function getHostCommandPaletteUnregister():
+  | ((id: string) => void)
+  | null {
+  try {
+    const hostScope = logseq.Experiments.ensureHostScope() as Record<string, unknown>;
+    const frontend = hostScope?.frontend as Record<string, unknown> | undefined;
+    const handler = frontend?.handler as Record<string, unknown> | undefined;
+
+    const commandPalette =
+      (handler?.command_palette as Record<string, unknown> | undefined) ??
+      (handler?.["command-palette"] as Record<string, unknown> | undefined) ??
+      (handler?.commandPalette as Record<string, unknown> | undefined);
+
+    const unregister = commandPalette?.unregister;
+    return typeof unregister === "function" ? (unregister as (id: string) => void) : null;
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object");
+}
+
+function deletePaletteCommandId(target: unknown, id: string): boolean {
+  if (!target) return false;
+
+  if (target instanceof Map) {
+    const had = target.has(id);
+    target.delete(id);
+    return had;
+  }
+
+  if (
+    typeof target === "object" &&
+    "delete" in (target as Record<string, unknown>) &&
+    typeof (target as { delete?: unknown }).delete === "function"
+  ) {
+    try {
+      (target as { delete: (key: string) => unknown }).delete(id);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  if (isRecord(target)) {
+    const had = Object.prototype.hasOwnProperty.call(target, id);
+    delete target[id];
+    return had;
+  }
+
+  return false;
+}
+
+function cleanupPaletteCommandRegistries(commandPalette: Record<string, unknown>, ids: string[]): void {
+  const registryCandidates: unknown[] = [
+    commandPalette.commands,
+    commandPalette.registry,
+    commandPalette.command_registry,
+    commandPalette.commandRegistry,
+  ];
+
+  const state = isRecord(commandPalette.state) ? commandPalette.state : null;
+  if (state) {
+    registryCandidates.push(
+      state.commands,
+      state.registry,
+      state.command_registry,
+      state.commandRegistry,
+    );
+  }
+
+  for (const registry of registryCandidates) {
+    if (!registry) continue;
+    for (const id of ids) {
+      deletePaletteCommandId(registry, id);
+    }
+  }
+}
+
+function getPaletteCommandIds(pluginId: string): string[] {
+  const ids: string[] = [];
+
+  for (const id of [pluginId, ...LEGACY_PLUGIN_IDS]) {
+    for (const key of COMMAND_KEYS) {
+      ids.push(`plugin.${id}/${key}`);
+      ids.push(`:plugin.${id}/${key}`);
+    }
+  }
+
+  return ids;
+}
+
+function cleanupRegisteredPaletteCommandsInHost(): void {
+  const pluginId = logseq.baseInfo?.id;
+  if (!pluginId) return;
+
+  const ids = getPaletteCommandIds(pluginId);
+  const unregister = getHostCommandPaletteUnregister();
+
+  if (unregister) {
+    for (const id of ids) {
+      try {
+        unregister(id);
+      } catch {
+        // Best effort across Logseq variants.
+      }
+    }
+  }
+
+  try {
+    const hostScope = logseq.Experiments.ensureHostScope() as Record<string, unknown>;
+    const frontend = hostScope?.frontend as Record<string, unknown> | undefined;
+    const handler = frontend?.handler as Record<string, unknown> | undefined;
+
+    const commandPalette =
+      (handler?.command_palette as Record<string, unknown> | undefined) ??
+      (handler?.["command-palette"] as Record<string, unknown> | undefined) ??
+      (handler?.commandPalette as Record<string, unknown> | undefined);
+
+    if (commandPalette) {
+      cleanupPaletteCommandRegistries(commandPalette, ids);
+    }
+  } catch {
+    // Best effort: host internals differ across builds.
+  }
+}
+
 function installUnloadCleanup(): void {
   logseq.beforeunload(async () => {
     await cleanupRegisteredCommands();
+    cleanupRegisteredPaletteCommandsInHost();
   });
 }
 
@@ -69,6 +247,22 @@ function registerCommands(): void {
       label: "Long Form: Toggle auto heading",
     },
     toggleAutoHeading,
+  );
+
+  logseq.App.registerCommandPalette(
+    {
+      key: "lf-normalize-selected-headings",
+      label: "Long Form: Normalize selected/current headings",
+    },
+    normalizeSelectedHeadings,
+  );
+
+  logseq.App.registerCommandPalette(
+    {
+      key: "lf-normalize-page-headings",
+      label: "Long Form: Normalize current page headings",
+    },
+    normalizeCurrentPageHeadings,
   );
 
   const headingLevels: Array<1 | 2 | 3 | 4 | 5 | 6> = [1, 2, 3, 4, 5, 6];
@@ -131,6 +325,7 @@ function registerCommands(): void {
   );
 
   logseq.Editor.registerBlockContextMenuItem("Long Form: Toggle auto heading", toggleAutoHeading);
+  logseq.Editor.registerBlockContextMenuItem("Long Form: Normalize selected/current headings", normalizeSelectedHeadings);
   logseq.Editor.registerBlockContextMenuItem("Long Form: Create meta block", createMetaBlock);
   logseq.Editor.registerBlockContextMenuItem("Long Form: Toggle current meta", toggleCurrentMetaVisibility);
   logseq.Editor.registerBlockContextMenuItem("Long Form: Copy markdown", exportCurrentToClipboard);
@@ -159,6 +354,8 @@ function registerModel(): void {
   logseq.provideModel({
     toggleLongFormMode,
     toggleAutoHeading,
+    normalizeSelectedHeadings,
+    normalizeCurrentPageHeadings,
     createMetaBlock,
     toggleGlobalMetaVisibility,
     toggleCurrentMetaVisibility,
@@ -181,27 +378,45 @@ function installSettingsHooks(): void {
   });
 }
 
-function installDomHooks(): void {
-  registerListEnhancements();
-  registerWordCountListeners();
+function installDomHooks(): Array<() => void> {
+  const cleanups: Array<() => void> = [];
+
+  cleanups.push(registerListEnhancements());
+  cleanups.push(registerWordCountListeners());
   registerRuntimeSync();
-  registerHeadingSync();
+  cleanups.push(registerHeadingSync());
+
+  return cleanups;
+}
+
+function installGlobalCleanup(cleanups: Array<() => void>): void {
+  const cleanupWindow = getCleanupWindow();
+  cleanupWindow.__lfPluginCleanup = () => {
+    for (const cleanup of cleanups.reverse()) {
+      try {
+        cleanup();
+      } catch {
+        // Best effort cleanup.
+      }
+    }
+    delete cleanupWindow.__lfPluginCleanup;
+  };
 }
 
 async function main(): Promise<void> {
+  runPreviousPluginCleanup();
   registerSettings();
   registerStyles();
   registerModel();
   cleanupLegacyUi();
   installUnloadCleanup();
   await cleanupRegisteredCommands();
+  cleanupRegisteredPaletteCommandsInHost();
   registerCommands();
   installSettingsHooks();
-  installDomHooks();
+  const cleanups = installDomHooks();
+  installGlobalCleanup(cleanups);
   refreshRuntimeState();
-
-  const settings = getSettings();
-  console.info("logseq-long-form loaded", settings);
 }
 
 logseq.ready(main).catch((error) => {

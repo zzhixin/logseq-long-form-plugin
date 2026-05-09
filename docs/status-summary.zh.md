@@ -1,6 +1,6 @@
-# Long Form Rebuild 状态总结
+# logseq-long-form-plugin 状态总结
 
-本文档是 `long-form-rebuild/` 的当前交接说明，目标是让后续重开会话时，不需要再从零回忆项目状态。
+本文档是 `logseq-long-form-plugin/` 的当前交接说明，目标是让后续重开会话时，不需要再从零回忆项目状态。
 
 本文档只描述 **当前源码工程真实存在的能力和问题**，不把失败实验或未落地想法写成已完成特性。
 
@@ -8,7 +8,17 @@
 
 ## 1. 工程定位
 
-`long-form-rebuild/` 是一个独立的新插件工程，用于重建 Logseq Long Form 插件的核心体验。
+`logseq-long-form-plugin/` 是一个独立的新插件工程，用于重建 Logseq Long Form 插件的核心体验。
+
+开发动机：
+
+- 更好地支持“长文缩进模式”
+- 经典插件 [logseq-long-form](https://github.com/sethyuan/logseq-long-form) 在 Windows 11 下的长文缩进模式存在可用性问题
+- 同时，经典插件在显示模式切换上的路径相对更深
+- 当前工程希望把核心写作流收敛成三个可直接切换的状态：
+  - 传统长文模式
+  - 长文缩进模式
+  - 大纲模式
 
 约束和原则：
 
@@ -18,7 +28,7 @@
 
 当前可加载目录：
 
-- `long-form-rebuild/dist/`
+- `logseq-long-form-plugin/dist/`
 
 构建命令：
 
@@ -27,6 +37,16 @@ npm install
 npm run typecheck
 npm run build
 ```
+
+当前版本号：
+
+- `0.2.0`
+
+当前对外定位：
+
+- 可进入更广泛测试的预览版
+- 适合真实写作使用
+- 仍保留少量宿主竞态边界，需要在 README 中明确说明
 
 ---
 
@@ -65,20 +85,24 @@ npm run build
 - `bodyBlockGap`
 - `indentNonHeadingChildren`
 
-### 2.3 标题相关命令和部分自动化
+### 2.3 标题相关命令
 
 已实现：
 
 - `Toggle auto heading`
 - `Set heading 1-6`
-- 给 heading block 按回车时，直接创建子块
-- 对 heading property / markdown heading 做一定程度的识别
-- 在 DB 变更时尝试做 heading 层级归一
+- `Normalize selected/current headings`
+- `Normalize current page headings`
+- 对 heading property / markdown heading 做识别
+- 手动设置 heading 时会做结构归一
 
 当前状态：
 
-- 有一套可工作的 heading 命令和部分自动行为
-- 但 **尚未完整复现原插件的标题自动缩进机制**
+- 手动 heading 命令稳定可用
+- 手动 normalize 会先退出编辑态，再按上下文重排标题层级
+- 标题块输入完成后按回车，会在 `insert-blocks` 阶段做结构归位与子块自动缩进
+- 这条自动化在正常输入节奏下可用
+- 极端快速输入时，仍可能碰到宿主编辑器事务竞态
 
 相关文件：
 
@@ -109,6 +133,8 @@ npm run build
 
 - 长文模式下保留 Logseq 原生 `numbered list` 的编号显示
 - 对块内容以 `- ` 开头的项目，在长文模式下显示 unordered list 圆点
+- 对普通 `- ` 项，长文模式下隐藏可见前缀
+- 对包含 inline code 的 `- \`...\`` 项，改为只隐藏渲染前缀，不再镜像整段文本，因此不会出现重影
 - 顶层 numbered list 保持与普通正文左对齐
 - 嵌套 numbered list 和 unordered list 在长文模式下逐层缩进
 - 非空 unordered list 项末尾按回车时，创建下一个 `- ` 列表项
@@ -171,9 +197,46 @@ time:: HH:mm
 - `src/features/word-count.ts`
 - `src/styles.ts`
 
+### 2.9 调试开关
+
+已实现：
+
+- 设置项 `debugLogging`
+- 默认关闭
+- 打开后才会启用：
+  - heading 调试日志
+  - list 调试日志
+  - input / DB / indent 诊断输出
+  - internal probe
+
+说明：
+
+- 修改该设置后建议 reload 插件
+- 正常使用时保持关闭，避免控制台噪音
+
 ---
 
-## 3. 当前未完成或明确未实现的功能
+## 3. 发布建议
+
+如果要推送到官方插件库，当前版本更适合作为：
+
+- 预览版 / beta 心态发布
+
+原因：
+
+- 主流程已经可用
+- 长文模式、标题回车、列表渲染、导出、字数统计都已成型
+- 但仍存在少量 Logseq 宿主层面的已知边界，例如极快输入时的编辑事务竞态，以及插件 reload 后的命令注册警告
+
+建议对外描述：
+
+- 强调这是“long-form writing experience for Logseq”
+- 清楚列出已知限制
+- 将 `Debug logging` 作为问题排查入口，而不是默认行为
+
+---
+
+## 4. 当前未完成或明确未实现的功能
 
 以下内容 **没有完成**，或者已经尝试过但当前版本中已清理掉。
 
@@ -215,11 +278,27 @@ time:: HH:mm
 
 - **未完成**
 
-目前存在的问题：
+当前结论：
 
-- `Toggle auto heading` 和自动层级联动还不够像原插件
-- 标题与正文的自动结构联动仍不稳定
-- 现在只能算“部分可用”，不能算“完整复现”
+- Logseq 在编辑器里看到的 markdown heading 文本，和插件在 `save-block` / outliner 事务里看到的内容，不是同一份原始输入
+- `### ` 这类输入在宿主保存链路中会先被 `trim`，并在后续标题处理里继续被规范化
+- 插件如果在 `save-block` 那一拍直接改结构，容易和宿主 editor 重挂、光标位置、Enter 后插入块等事务冲突
+- 当前源码已经改成：`save-block` 只观察，真正的结构归位放到 `insert-blocks` 之后处理
+
+源码确认点：
+
+- `frontend.components.editor/mock-textarea` 的 `did-update` 会调用 `handle-last-input`
+- `handle-last-input` 只处理 `/`、`#` 搜索和 `1. ` number list，不处理 heading 自动转换
+- `frontend.handler.editor/save-block-aux!` 会先 `string/trim`
+- outliner 保存链和 `batch-set-heading!` 还会继续清理 markdown heading 前缀
+
+因此当前策略：
+
+- 保留稳定的手动 heading 命令
+- 自动标题结构归位只在块完成输入并按回车后触发
+- 自动子块缩进使用宿主命令 `logseq.editor/indent` / `outdent`
+- 对已开始输入的新子块，尽量恢复已输入内容与光标
+- 但不承诺覆盖极端高速输入竞态
 
 ### 3.5 原插件级别的 visual tree 交互
 
@@ -239,7 +318,10 @@ time:: HH:mm
 
 - 不写入 `logseq.order-list-type:: bullet`
 - 只根据块内容前缀 `- ` 做渲染增强
-- 编辑态保留原始 `- ` 文本，preview 状态隐藏可见的 `- `
+- 编辑态保留原始 `- ` 文本
+- preview 状态下：
+  - 普通文本列表项使用镜像文本方案隐藏 `- `
+  - 含 inline code 的列表项改为直接隐藏渲染前缀，避免代码重影
 - 非空 `- ` 项末尾回车时，尝试创建下一个 `- ` 项
 
 ## 4. 已清理的无效代码

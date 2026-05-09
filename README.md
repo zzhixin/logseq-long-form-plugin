@@ -1,27 +1,35 @@
-# logseq-long-form
+# Long Form Plugin
 
-`logseq-long-form` is a rebuild of the classic long-form writing experience for Logseq.
+Long Form Plugin is a rebuilt long-form writing experience for Logseq.
 
-It is designed for people who like writing in Logseq but want the page to feel less like an outliner and more like a clean draft editor, without giving up blocks, headings, lists, and page structure.
+It is for people who like drafting in Logseq, but want pages to feel closer to a focused editor than a raw outliner, without giving up blocks, headings, lists, and page structure.
 
-## What It Does
+## Why This Plugin Exists
 
-When you switch into long-form mode, the page becomes easier to read and write:
+This plugin was built primarily to better support the indented long-form writing mode.
 
-- The writing column becomes cleaner and more focused
-- Bullets and tree lines are hidden for normal paragraphs
-- Numbered lists stay visible and aligned
-- `- ` lists render properly in long-form mode
-- Nested lists keep their structure
-- Headings, meta blocks, and timestamps get special handling
-- A floating word-count widget can stay visible while you write
-- Markdown export is built in
+The classic plugin, [logseq-long-form](https://github.com/sethyuan/logseq-long-form), remains an important reference, but its indented long-form mode shows problems on Windows 11. On top of that, switching between display styles is relatively deep in the interaction flow.
 
-The top toolbar button cycles through three display modes:
+This rebuild is meant to make that workflow easier and more reliable by giving the editor three direct display states:
 
-- Outline
-- Long form
-- Long form with indentation
+- `Outline`
+- `Long form`
+- `Long form with indentation`
+
+## Highlights
+
+- Three display modes:
+  - `Outline`
+  - `Long form`
+  - `Long form with indentation`
+- Cleaner writing column for long-form drafting
+- Hidden bullets and tree lines for normal paragraphs
+- Better handling for numbered lists and `- ` unordered lists
+- Inline code in unordered lists stays clean without duplicate rendering
+- Heading-aware structure helpers after pressing `Enter`
+- Floating word-count widget
+- Markdown export and direct copy to clipboard
+- Meta block helpers and interstitial timestamp insertion
 
 ## Installation
 
@@ -35,55 +43,56 @@ npm run build
 
 2. In Logseq, load the [`dist/`](./dist) folder as an unpacked plugin.
 
-## Daily Use
+## Core Workflow
 
-After the plugin is loaded, the main things you will use are:
+After the plugin is loaded, most daily use comes from three places:
 
-- The toolbar mode button: switches between outline and long-form views
-- The export button: opens the Markdown export panel, or copies directly if direct export is enabled
-- The command palette: includes mode switching, heading tools, meta block tools, export, and timestamp insertion
+- The toolbar mode button for cycling display modes
+- The export button for opening the Markdown export panel
+- The command palette for heading tools, meta block tools, export, and timestamps
 
-Some writing behaviors are also enhanced automatically:
+Automatic editing helpers include:
 
 - Pressing `Enter` at the end of a heading creates a child block
+- Pressing `Enter` after finishing a heading can normalize its structural position
 - Pressing `Enter` at the end of a non-empty `- ` item creates the next list item
 - Pressing `Enter` on an empty `- ` item exits the list
 
 ## Settings
 
-The plugin currently includes settings for:
+The plugin includes settings for:
 
-- Display width and spacing
-- Showing or hiding timestamps
-- Showing or hiding meta blocks
+- Content width and spacing
+- Timestamp visibility
+- Meta block visibility
 - Word-count goal and font size
 - Direct export to clipboard
 - Right-sidebar support
+- Debug logging for issue tracing
 
-## Markdown Export
+## Known Limitations
 
-The exporter is meant to produce cleaner Markdown than raw block text.
+This version is usable for real writing, but it is still a practical rebuild rather than a perfect clone of the historical plugin.
 
-It currently:
+Known edges:
 
-- Removes long-form-only helper tags and list properties
-- Preserves headings
-- Preserves numbered lists
-- Preserves real `- ` content where appropriate
-- Can copy directly to the clipboard without opening the export panel
-
-## Current Limitations
-
-This rebuild is already usable for real writing, but it is not trying to claim full parity with the historical plugin yet.
-
-The main known gaps are:
-
-- The original heading automation is only partially recreated
-- Some edge cases in export still need refinement
+- Extremely fast typing immediately after structural auto-indent can still race with Logseq's host editor
+- Some export edge cases still need refinement
 - The old visual guide / threading UI is not included
+- Plugin reload in Logseq may still show duplicate command-registration warnings even when behavior is correct
+
+## Release Notes
+
+This repo is now in a good state for preview use and wider testing:
+
+- Main long-form modes are stable
+- Sidebar wake-up no longer drops the view back to outline mode
+- Heading enter behavior works in normal writing flow
+- Unordered list rendering is much cleaner, including inline code cases
+- Debug logging is available, but off by default
 
 ## Project Notes
 
 - This project does not bundle old release files from the original plugin
 - The original repository is used only as behavior reference
-- For detailed internal status and restart notes, see [docs/status-summary.zh.md](./docs/status-summary.zh.md)
+- For detailed internal notes, see [docs/status-summary.zh.md](./docs/status-summary.zh.md)

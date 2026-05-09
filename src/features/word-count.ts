@@ -109,23 +109,32 @@ export function scheduleWordCountRefresh(): void {
   void updateWordCount();
 }
 
-export function registerWordCountListeners(): void {
+export function registerWordCountListeners(): () => void {
   const parentDoc = parent?.document;
-  if (!parentDoc) return;
+  if (!parentDoc) return () => undefined;
+
+  const onInput = () => {
+    void updateWordCount();
+  };
+
+  const onClick = () => {
+    void updateWordCount();
+  };
 
   parentDoc.addEventListener(
     "input",
-    () => {
-      void updateWordCount();
-    },
+    onInput,
     true,
   );
 
   parentDoc.addEventListener(
     "click",
-    () => {
-      void updateWordCount();
-    },
+    onClick,
     true,
   );
+
+  return () => {
+    parentDoc.removeEventListener("input", onInput, true);
+    parentDoc.removeEventListener("click", onClick, true);
+  };
 }

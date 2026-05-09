@@ -6,7 +6,19 @@ export function registerStyles(): void {
   const settings = getSettings();
   const nonHeadingIndent = settings.indentNonHeadingChildren
     ? `
-  .lf-long-form .ls-block[data-heading="true"] > .block-children-container {
+  .lf-long-form:not(.lf-keep-indents) .ls-block[data-heading="true"] > .block-children-container,
+  .lf-long-form:not(.lf-keep-indents) .ls-block:has(> .block-main-container :is(h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6)) > .block-children-container {
+    margin-left: 0 !important;
+  }
+
+  .lf-long-form:not(.lf-keep-indents) .ls-block:not([data-heading="true"]):not(:has(> .block-main-container :is(h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6))) > .block-children-container > .block-children > .ls-block > .block-main-container {
+    left: 0 !important;
+    width: 100% !important;
+  }`
+    : "";
+  const resetAllChildrenIndent = !settings.indentNonHeadingChildren
+    ? `
+  .lf-long-form:not(.lf-keep-indents) .block-children-container {
     margin-left: 0 !important;
   }`
     : "";
@@ -38,14 +50,19 @@ export function registerStyles(): void {
     --lf-meta-fg: rgba(71, 85, 105, 0.9);
   }
 
-  .lf-long-form .page-blocks-inner,
-  .lf-long-form .blocks-container {
+  .lf-long-form .page-blocks-inner {
     width: min(100%, calc(var(--lf-content-width) + var(--lf-bullet-offset)));
     max-width: calc(var(--lf-content-width) + var(--lf-bullet-offset));
     margin-inline: auto;
   }
 
-  .lf-long-form .ls-block > .block-main-container {
+  .lf-long-form:not(.lf-keep-indents) .ls-block > .block-main-container {
+    position: relative;
+    left: calc(var(--lf-bullet-offset) * -1);
+    width: calc(100% + var(--lf-bullet-offset));
+  }
+
+  .lf-long-form.lf-keep-indents .blocks-container {
     position: relative;
     left: calc(var(--lf-bullet-offset) * -1);
     width: calc(100% + var(--lf-bullet-offset));
@@ -116,9 +133,8 @@ export function registerStyles(): void {
     opacity: 0.6;
   }
 
-  .lf-long-form:not(.lf-keep-indents) .block-children-container {
-    margin-left: 0 !important;
-  }
+  ${nonHeadingIndent}
+  ${resetAllChildrenIndent}
 
   .lf-long-form .bullet-container,
   .lf-long-form .bullet-link-wrap {
@@ -207,7 +223,7 @@ export function registerStyles(): void {
 
   #lf-toolbar-toggle-button {
     position: relative;
-    top: -4px;
+    top: -6px;
     vertical-align: middle;
   }
 
