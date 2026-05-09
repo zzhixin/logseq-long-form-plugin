@@ -676,6 +676,13 @@ async function autoHeadingBlocks(blocks: BlockEntity[], editingSnapshot: Editing
   return changedCount;
 }
 
+export async function autoHeadingSpecificBlocks(blocks: BlockEntity[]): Promise<number> {
+  if (blocks.length === 0) return 0;
+
+  await logseq.Editor.exitEditingMode?.(true);
+  return autoHeadingBlocks(blocks, null);
+}
+
 export async function toggleAutoHeading(): Promise<void> {
   const scope = await getAutoHeadingScope();
   if (scope.blocks.length === 0) {

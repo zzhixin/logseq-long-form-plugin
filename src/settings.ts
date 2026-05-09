@@ -80,6 +80,13 @@ export const settingsSchema: SettingSchemaDesc[] = [
     description: "When enabled, the export button copies markdown directly instead of opening the export panel.",
   },
   {
+    key: "newlineToBlocks",
+    type: "boolean",
+    default: true,
+    title: "Paste newlines as sibling blocks",
+    description: "When enabled, pasted multi-line text is split into sibling blocks instead of staying inside one block.",
+  },
+  {
     key: "debugLogging",
     type: "boolean",
     default: false,
@@ -101,6 +108,7 @@ export type PluginSettings = {
   wordCountFontSize: number;
   showWordCount: boolean;
   directExportToClipboard: boolean;
+  newlineToBlocks: boolean;
   debugLogging: boolean;
 };
 
@@ -117,6 +125,7 @@ const defaultSettings: PluginSettings = {
   wordCountFontSize: 13,
   showWordCount: true,
   directExportToClipboard: false,
+  newlineToBlocks: true,
   debugLogging: false,
 };
 

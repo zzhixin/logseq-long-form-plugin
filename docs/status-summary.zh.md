@@ -15,6 +15,7 @@
 - 更好地支持“长文缩进模式”
 - 经典插件 [logseq-long-form](https://github.com/sethyuan/logseq-long-form) 在 Windows 11 下的长文缩进模式存在可用性问题
 - 同时，经典插件在显示模式切换上的路径相对更深
+- 希望把“增强粘贴”和“粘贴后按标题关系自动整理”并入同一个写作插件，而不是依赖额外插件拼装工作流
 - 当前工程希望把核心写作流收敛成三个可直接切换的状态：
   - 传统长文模式
   - 长文缩进模式
@@ -216,6 +217,25 @@ time:: HH:mm
 
 - 修改该设置后建议 reload 插件
 - 正常使用时保持关闭，避免控制台噪音
+
+### 2.10 粘贴增强
+
+已实现：
+
+- 编辑态下接管 `Ctrl+V` / `Cmd+V`
+- 如果剪贴板文本中包含 base64 图片：
+  - 自动写入当前图谱的 `assets/`
+  - 自动插入 markdown 图片引用
+- 普通文本粘贴保持可用
+- 多行文本粘贴在开启设置时可自动拆成 sibling blocks
+- fenced code block 和 `$$ ... $$` 多行内容不会被错误拆块
+- 每次自动粘贴后，会只对“刚粘贴出来的块”执行一次 auto heading
+
+相关文件：
+
+- `src/features/paste.ts`
+- `src/features/headings.ts`
+- `src/settings.ts`
 
 ---
 

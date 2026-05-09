@@ -18,6 +18,8 @@ This rebuild is meant to make that workflow easier and more reliable by giving t
 - `Long form`
 - `Long form with indentation`
 
+It also grows out of a second workflow need: keeping pasted writing material usable inside the long-form workflow without cleanup friction. In this rebuilt plugin, paste handling and export are treated as matching parts of the same writing loop: bringing material into long-form mode cleanly, then taking it back out as clean markdown. That means pasted content can be normalized to fit long-form indentation rules automatically, while base64 images are also converted into graph assets instead of being dumped into block text.
+
 ## Highlights
 
 - Three display modes:
@@ -29,12 +31,15 @@ This rebuild is meant to make that workflow easier and more reliable by giving t
 - Better handling for numbered lists and `- ` unordered lists
 - Inline code in unordered lists stays clean without duplicate rendering
 - Heading-aware structure helpers after pressing `Enter`
+- Long-form-aware paste handling for multi-line text and pasted base64 images
+- Automatic post-paste auto-heading pass scoped only to the pasted blocks
 - Floating word-count widget
 - Markdown export and direct copy to clipboard
 - Meta block helpers and interstitial timestamp insertion
 
-![Animated preview of the three writing modes in Long Form Plugin](logseq-long-form-plugin-illustration.gif)
+![Animated preview of the three writing modes in Long Form Plugin](overall-illustration.gif)
 
+![Paste illustration](paste-illustration.gif)
 
 ## Preview
 
@@ -66,6 +71,9 @@ Automatic editing helpers include:
 - Pressing `Enter` after finishing a heading can normalize its structural position
 - Pressing `Enter` at the end of a non-empty `- ` item creates the next list item
 - Pressing `Enter` on an empty `- ` item exits the list
+- Pasting multi-line text can split it into sibling blocks and immediately normalize the pasted structure for long-form use
+- Pasting clipboard content with base64 images converts those images into graph assets and markdown image references
+- After automatic paste insertion, the plugin runs auto heading only on the pasted blocks so pasted outlines fit the surrounding long-form structure
 
 ## Settings
 

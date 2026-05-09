@@ -7,6 +7,10 @@
 - Fixed ordered and unordered list rendering edge cases in Home and long-form views
 - Fixed markdown export so ordered lists keep sibling numbering instead of resetting every item to `1.`
 - Improved markdown export markers for nested ordered lists
+- Merged paste enhancement behavior into the plugin:
+  - base64 image paste converts images into graph assets and markdown references
+  - multi-line paste can split content into sibling blocks
+  - pasted blocks now receive a scoped auto-heading pass after insertion
 
 ## 0.2.0
 

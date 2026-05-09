@@ -12,6 +12,7 @@ import {
 import { insertInterstitialJournalStamp } from "./features/journal";
 import { registerListEnhancements } from "./features/lists";
 import { toggleLongFormMode } from "./features/mode";
+import { registerPasteHandler } from "./features/paste";
 import { refreshRuntimeState, registerRuntimeSync } from "./features/runtime-sync";
 import { registerWordCountListeners } from "./features/word-count";
 import { getLongFormDisplayMode } from "./logseq-dom";
@@ -47,6 +48,7 @@ const COMMAND_KEYS = [
   "lf-export-markdown",
   "lf-copy-markdown",
   "lf-interstitial-journal",
+  "lf-paste-from-clipboard",
 ] as const;
 
 function cleanupLegacyUi(): void {
@@ -397,6 +399,7 @@ function installDomHooks(): Array<() => void> {
   cleanups.push(registerWordCountListeners());
   registerRuntimeSync();
   cleanups.push(registerHeadingSync());
+  registerPasteHandler();
 
   return cleanups;
 }
