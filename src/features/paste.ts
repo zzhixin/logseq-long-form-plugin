@@ -24,6 +24,8 @@ type SavedImage = {
   mimeType: string;
   extension: string;
   alt?: string;
+  renderedWidth?: number;
+  renderedHeight?: number;
 };
 
 type ParseClipboardResult = {
@@ -217,7 +219,7 @@ function renderSegmentsToMarkdown(segments: ParsedSegment[], savedImages: SavedI
     if (!image) continue;
 
     const altText = sanitizeAltText(image.alt);
-    const imageMarkdown = `![${altText}](${image.markdownPath})`;
+    const imageMarkdown = formatImageMarkdown(altText, image);
     output += getSettings().newlineToBlocks
       ? withBlockSpacing(output, imageMarkdown, nextSegment)
       : withReadableSpacing(output, imageMarkdown, nextSegment);
@@ -275,10 +277,12 @@ function splitContentIntoBlockChunks(content: string): string[] {
   let currentChunkLines: string[] = [];
   let fenceMarker: "```" | "~~~" | null = null;
   let inMathBlock = false;
+  let inQuoteBlock = false;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const trimmed = line.trim();
+    const isQuoteLine = isMarkdownQuoteLine(line);
 
     currentChunkLines.push(line);
 
@@ -298,12 +302,16 @@ function splitContentIntoBlockChunks(content: string): string[] {
       inMathBlock = true;
     }
 
+    const nextLine = lines[index + 1];
+    inQuoteBlock = isQuoteLine && nextLine != null && isMarkdownQuoteLine(nextLine);
+
     const nextLineExists = index < lines.length - 1;
-    const shouldCloseChunk = !nextLineExists || (!fenceMarker && !inMathBlock);
+    const shouldCloseChunk = !nextLineExists || (!fenceMarker && !inMathBlock && !inQuoteBlock);
 
     if (shouldCloseChunk) {
       chunks.push(currentChunkLines.join("\n"));
       currentChunkLines = [];
+      inQuoteBlock = false;
     }
   }
 
@@ -314,16 +322,36 @@ function splitContentIntoBlockChunks(content: string): string[] {
   return chunks;
 }
 
+function isMarkdownQuoteLine(line: string): boolean {
+  return /^\s*>\s?/.test(line);
+}
+
 function withReadableSpacing(currentOutput: string, imageMarkdown: string, nextSegment?: ParsedSegment): string {
-  const prefix = currentOutput.length > 0 && !/\s$/.test(currentOutput) ? "\n\n" : "";
+  const prefix = getTrailingQuotePrefix(currentOutput) === ""
+    ? ""
+    : currentOutput.length > 0 && !/\s$/.test(currentOutput)
+      ? "\n\n"
+      : "";
   const suffix = nextSegment?.type === "text" && nextSegment.content.startsWith("\n") ? "" : "\n\n";
   return `${prefix}${imageMarkdown}${suffix}`;
 }
 
 function withBlockSpacing(currentOutput: string, imageMarkdown: string, nextSegment?: ParsedSegment): string {
-  const prefix = currentOutput.length > 0 && !currentOutput.endsWith("\n") ? "\n" : "";
+  const prefix =
+    currentOutput.length > 0 && !currentOutput.endsWith("\n") ? getTrailingQuotePrefix(currentOutput) : "";
   const suffix = nextSegment?.type === "text" && nextSegment.content.startsWith("\n") ? "" : "\n";
   return `${prefix}${imageMarkdown}${suffix}`;
+}
+
+function getTrailingQuotePrefix(currentOutput: string): string {
+  if (/(?:^|\n)\s*>$/.test(currentOutput)) return " ";
+  return /(?:^|\n)\s*>\s*$/.test(currentOutput) ? "" : "\n";
+}
+
+function formatImageMarkdown(altText: string, image: SavedImage): string {
+  const imageMarkdown = `![${altText}](${image.markdownPath})`;
+  if (!image.renderedWidth || !image.renderedHeight) return imageMarkdown;
+  return `${imageMarkdown}{:height ${image.renderedHeight}, :width ${image.renderedWidth}}`;
 }
 
 function sanitizeAltText(alt?: string): string {
@@ -333,6 +361,7 @@ function sanitizeAltText(alt?: string): string {
 async function saveBase64Image(segment: ParsedImageSegment): Promise<SavedImage> {
   const fileName = createAssetFileName(segment.extension);
   const bytes = base64ToUint8Array(segment.base64Data);
+  const dimensions = await resolveRenderedImageDimensions(segment);
   const graph = await logseq.App.getCurrentGraph();
   const directWriteResult = await tryWriteToGraphAssets(fileName, bytes);
 
@@ -343,6 +372,8 @@ async function saveBase64Image(segment: ParsedImageSegment): Promise<SavedImage>
       mimeType: segment.mimeType,
       extension: segment.extension,
       alt: segment.alt,
+      renderedWidth: dimensions?.width,
+      renderedHeight: dimensions?.height,
     };
   }
 
@@ -356,6 +387,52 @@ async function saveBase64Image(segment: ParsedImageSegment): Promise<SavedImage>
     mimeType: segment.mimeType,
     extension: segment.extension,
     alt: segment.alt,
+    renderedWidth: dimensions?.width,
+    renderedHeight: dimensions?.height,
+  };
+}
+
+async function resolveRenderedImageDimensions(
+  segment: ParsedImageSegment,
+): Promise<{ width: number; height: number } | null> {
+  const naturalDimensions = await readBase64ImageDimensions(segment);
+  if (!naturalDimensions) return null;
+
+  const viewport = getHostViewportSize();
+  const maxWidth = Math.max(1, Math.floor(Math.min(getSettings().contentWidth, viewport.width - 48) * (2 / 3)));
+  const maxHeight = Math.max(1, Math.floor((viewport.height - 96) * (2 / 3)));
+  const scale = Math.min(1, maxWidth / naturalDimensions.width, maxHeight / naturalDimensions.height);
+
+  return {
+    width: Math.max(1, Math.round(naturalDimensions.width * scale)),
+    height: Math.max(1, Math.round(naturalDimensions.height * scale)),
+  };
+}
+
+function readBase64ImageDimensions(segment: ParsedImageSegment): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    const timeout = window.setTimeout(() => resolve(null), 1500);
+
+    image.onload = () => {
+      window.clearTimeout(timeout);
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      resolve(width > 0 && height > 0 ? { width, height } : null);
+    };
+    image.onerror = () => {
+      window.clearTimeout(timeout);
+      resolve(null);
+    };
+    image.src = `data:${segment.mimeType};base64,${segment.base64Data}`;
+  });
+}
+
+function getHostViewportSize(): { width: number; height: number } {
+  const hostWindow = window.parent ?? window;
+  return {
+    width: hostWindow.innerWidth || window.innerWidth || getSettings().contentWidth,
+    height: hostWindow.innerHeight || window.innerHeight || 800,
   };
 }
 
