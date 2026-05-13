@@ -399,7 +399,7 @@ function installDomHooks(): Array<() => void> {
   cleanups.push(registerWordCountListeners());
   registerRuntimeSync();
   cleanups.push(registerHeadingSync());
-  registerPasteHandler();
+  cleanups.push(registerPasteHandler());
 
   return cleanups;
 }

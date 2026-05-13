@@ -43,6 +43,11 @@ const IMAGE_MIME_TO_EXTENSION: Record<string, string> = {
 const IMAGE_DATA_URL_PATTERN =
   /data:(image\/(?:png|jpeg|jpg|gif|webp));base64,([A-Za-z0-9+/=\r\n]+)/gi;
 
+type PasteCleanupWindow = Window &
+  typeof globalThis & {
+    __lfPasteCleanup?: () => void;
+  };
+
 type MatchCandidate = {
   start: number;
   end: number;
@@ -58,47 +63,68 @@ function debugPaste(message: string, details?: Record<string, unknown>): void {
   console.info(PASTE_DEBUG_PREFIX, message, details ?? {});
 }
 
-export function registerPasteHandler(): void {
-  logseq.App.registerCommandShortcut(
-    {
-      mode: "editing",
-      binding: "mod+v",
-    },
-    async () => {
-      await tryHandleClipboardPaste();
-    },
-    {
-      key: "lf-paste-from-clipboard",
-      label: "Long Form: Paste from clipboard",
-      desc: "Transform pasted base64 images into assets and split multi-line text into sibling blocks when enabled.",
-    },
-  );
+export function registerPasteHandler(): () => void {
+  const parentDoc = parent?.document;
+  if (!parentDoc) return () => undefined;
+
+  const cleanupWindow = getPasteCleanupWindow();
+  cleanupWindow.__lfPasteCleanup?.();
+
+  const onPaste = (event: ClipboardEvent) => {
+    void handlePasteEvent(event);
+  };
+
+  parentDoc.addEventListener("paste", onPaste, true);
+
+  const cleanup = () => {
+    parentDoc.removeEventListener("paste", onPaste, true);
+    if (cleanupWindow.__lfPasteCleanup === cleanup) {
+      delete cleanupWindow.__lfPasteCleanup;
+    }
+  };
+
+  cleanupWindow.__lfPasteCleanup = cleanup;
+  return cleanup;
 }
 
-async function tryHandleClipboardPaste(): Promise<void> {
-  try {
-    await handleClipboardPaste();
-  } catch (error) {
-    console.error("long-form paste: clipboard handling failed", error);
-    logseq.UI.showMsg("Unable to read the system clipboard. Please check permissions or use normal paste.", "warning", {
-      timeout: 3500,
-    });
-  }
+function isEditingPasteTarget(target: EventTarget | null): boolean {
+  return Boolean(closestElement(target, ".block-editor"));
 }
 
-async function handleClipboardPaste(): Promise<void> {
-  const clipboardText = await readClipboardText();
+async function handlePasteEvent(event: ClipboardEvent): Promise<void> {
+  if (!isEditingPasteTarget(event.target)) return;
 
-  debugPaste("clipboard shortcut triggered", {
+  const clipboardData = event.clipboardData;
+  if (!clipboardData) return;
+
+  const items = Array.from(clipboardData.items ?? []);
+  const hasStandaloneImage = items.some((item) => item.kind === "file" && item.type.startsWith("image/"));
+  const plainText = clipboardData.getData("text/plain") ?? "";
+  const htmlText = clipboardData.getData("text/html") ?? "";
+  const clipboardText = plainText || (containsBase64Image(htmlText) ? htmlText : "");
+  const hasText = clipboardText.length > 0;
+
+  debugPaste("paste event observed", {
+    hasStandaloneImage,
+    hasText,
+    itemTypes: items.map((item) => `${item.kind}:${item.type}`),
+    plainTextLength: plainText.length,
+    htmlTextLength: htmlText.length,
     textPreview: clipboardText.slice(0, 120),
     textLength: clipboardText.length,
     containsBase64: containsBase64Image(clipboardText),
   });
 
-  if (!clipboardText) {
-    logseq.UI.showMsg("Clipboard text is empty.", "warning", { timeout: 2000 });
+  if (hasStandaloneImage && !hasText) {
+    debugPaste("standalone image detected, letting Logseq handle native paste");
     return;
   }
+
+  if (!hasText) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  event.stopPropagation();
 
   if (!containsBase64Image(clipboardText)) {
     const affectedBlocks = await insertPlainTextFallback(clipboardText);
@@ -116,14 +142,13 @@ async function handleClipboardPaste(): Promise<void> {
   await processBase64Paste(result.segments, clipboardText);
 }
 
-async function readClipboardText(): Promise<string> {
-  const clipboard = parent.navigator?.clipboard ?? navigator.clipboard;
+function closestElement(target: EventTarget | null, selector: string): Element | null {
+  const candidate = target as { closest?: (selector: string) => Element | null } | null;
+  return candidate?.closest?.(selector) ?? null;
+}
 
-  if (!clipboard?.readText) {
-    throw new Error("Clipboard API is not available in the current context.");
-  }
-
-  return clipboard.readText();
+function getPasteCleanupWindow(): PasteCleanupWindow {
+  return (window.top ?? window.parent ?? window) as PasteCleanupWindow;
 }
 
 async function processBase64Paste(segments: ParsedSegment[], rawText: string): Promise<void> {
@@ -140,11 +165,9 @@ async function processBase64Paste(segments: ParsedSegment[], rawText: string): P
     const affectedBlocks = await insertTransformedSegments(segments, savedImages);
     await autoHeadingSpecificBlocks(affectedBlocks);
 
-    if (isDebugLoggingEnabled()) {
-      await logseq.UI.showMsg(`Converted and inserted ${savedImages.length} pasted image reference(s).`, "success", {
-        timeout: 2500,
-      });
-    }
+    await logseq.UI.showMsg(`Converted and inserted ${savedImages.length} pasted image reference(s).`, "success", {
+      timeout: 2500,
+    });
   } catch (error) {
     console.error("long-form paste: failed to transform pasted base64 images", error);
     await logseq.UI.showMsg("Base64 image conversion failed. Falling back to plain text paste.", "warning", {
@@ -454,7 +477,9 @@ function getNodeRuntime():
 
 function containsBase64Image(text: string): boolean {
   IMAGE_DATA_URL_PATTERN.lastIndex = 0;
-  return IMAGE_DATA_URL_PATTERN.test(text);
+  const result = IMAGE_DATA_URL_PATTERN.test(text);
+  IMAGE_DATA_URL_PATTERN.lastIndex = 0;
+  return result;
 }
 
 function parseClipboardText(text: string): ParseClipboardResult {
@@ -503,6 +528,7 @@ function parseClipboardText(text: string): ParseClipboardResult {
 }
 
 function collectMatches(text: string): MatchCandidate[] {
+  IMAGE_DATA_URL_PATTERN.lastIndex = 0;
   const matches: MatchCandidate[] = [];
   const ranges: Array<{ start: number; end: number }> = [];
 
