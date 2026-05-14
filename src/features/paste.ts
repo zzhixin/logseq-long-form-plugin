@@ -124,6 +124,11 @@ async function handlePasteEvent(event: ClipboardEvent): Promise<void> {
 
   if (!hasText) return;
 
+  if (shouldUseNativeLogseqPaste(plainText)) {
+    debugPaste("logseq-style dashed lines detected, letting Logseq handle native paste");
+    return;
+  }
+
   event.preventDefault();
   event.stopImmediatePropagation();
   event.stopPropagation();
@@ -151,6 +156,16 @@ function closestElement(target: EventTarget | null, selector: string): Element |
 
 function getPasteCleanupWindow(): PasteCleanupWindow {
   return (window.top ?? window.parent ?? window) as PasteCleanupWindow;
+}
+
+function shouldUseNativeLogseqPaste(text: string): boolean {
+  const nonEmptyLines = text
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trimStart())
+    .filter((line) => line.length > 0);
+
+  return nonEmptyLines.length > 0 && nonEmptyLines.every((line) => line.startsWith("-"));
 }
 
 async function processBase64Paste(segments: ParsedSegment[], rawText: string): Promise<void> {

@@ -87,7 +87,7 @@ export function registerStyles(): void {
   .lf-long-form .ls-block > .block-main-container > .block-content-wrapper,
   .lf-long-form .ls-block > .block-main-container > .editor-wrapper {
     border-radius: 8px;
-    padding-block: 2px;
+    padding-block: 0;
   }
 
   .lf-long-form .block-content h1,
@@ -163,16 +163,35 @@ export function registerStyles(): void {
     content: none !important;
   }
 
+  .lf-long-form .block-children-left-border,
+  .lf-long-form .block-children-left-border * {
+    pointer-events: none !important;
+  }
+
   .lf-long-form .ls-block > .block-main-container > .block-content-wrapper,
   .lf-long-form .ls-block > .block-main-container > .editor-wrapper {
     padding-left: 0 !important;
   }
 
-  .lf-long-form .bullet-container:hover,
-  .lf-long-form .bullet-link-wrap:hover,
-  .lf-long-form .bullet-container:focus-visible,
-  .lf-long-form .bullet-link-wrap:focus-visible {
+  .lf-long-form .ls-block > .block-main-container > .block-control-wrap:hover .bullet-container,
+  .lf-long-form .ls-block > .block-main-container > .block-control-wrap:hover .bullet-link-wrap {
     opacity: 1 !important;
+  }
+
+  .lf-long-form .ls-block[data-collapsed] > .block-main-container > .block-control-wrap .bullet-link-wrap,
+  .lf-long-form .ls-block[data-collapsed] > .block-main-container > .block-control-wrap .bullet-container {
+    opacity: 1 !important;
+  }
+
+  .lf-long-form .ls-block[data-collapsed] > .block-main-container > .block-control-wrap .bullet-container.bullet-closed:not(.typed-list) {
+    background-color: var(--lx-gray-04-alpha, var(--ls-block-bullet-border-color, var(--rx-gray-04-alpha))) !important;
+  }
+
+  .lf-long-form .ls-block:has(> .block-children-container > .block-children > .ls-block[data-collapsed])
+    > .block-main-container > .block-control-wrap:not(:hover) .bullet-link-wrap,
+  .lf-long-form .ls-block:has(> .block-children-container > .block-children > .ls-block[data-collapsed])
+    > .block-main-container > .block-control-wrap:not(:hover) .bullet-container {
+    opacity: 0 !important;
   }
 
   .lf-long-form .ls-block[data-lf-ordered-list] > .block-main-container > .block-control-wrap .bullet-container,
